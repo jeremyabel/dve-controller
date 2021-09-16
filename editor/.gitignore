@@ -1,1 +1,3 @@
-*.o
+intermediate/
+build/
+.vs/
