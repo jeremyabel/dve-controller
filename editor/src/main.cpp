@@ -1,16 +1,9 @@
-#include <iostream>
-#include <cstdio>
-#include <cstdlib>
-#include <string>
-
-#include "dmeditor.h"
+#include "editor.h"
 
 int main(int argc, char *argv[])
 {	
-	DMEditor Editor;
-	Editor.Run();
+	Editor editor;
+	editor.Run();
 
 	return 0;
 }
-
-
