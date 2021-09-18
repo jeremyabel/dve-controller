@@ -2,6 +2,7 @@
 
 #include "../device.h"
 #include "types.h"
+#include "enums.h"
 
 #define PARAM(MODULE, ID, TYPE, NAME) Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME);
 #define PARAM_F(MODULE, ID, FLAGS, TYPE, NAME)  Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME, FLAGS);
@@ -1013,7 +1014,7 @@ struct DME7000 : public Device
 	PARAM_F(0xA8, 0x46, ParameterFlags_Global, Enum, ProcessControl_Key_Filter);
 	PARAM_F(0xA8, 0x47, ParameterFlags_Global, Enum, ProcessControl_Analog_External_Key);
 	PARAM_F(0xA8, 0x4A, ParameterFlags_Global, Enum, ProcessControl_Adaptive_Mode);
-	PARAM( 0x90, 0x53,                         Bool, ProcessControl_Wrap_Around);
+	PARAM( 0x90, 0x53, Bool, ProcessControl_Wrap_Around);
 
 	// TRANSFORM
 	PARAM(0xA1, 0x08, F32, Transform_Location_X);
