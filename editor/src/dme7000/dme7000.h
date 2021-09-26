@@ -19,6 +19,7 @@ struct DME7000 : Device
 	U8 SubPictureId;
 
 	Serial SerialComms;
+	SerialConfiguration SerialConfig;
 
 	GraphicGUI GraphicGui;
 

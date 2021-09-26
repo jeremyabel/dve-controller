@@ -9,8 +9,8 @@ DME7000::DME7000(const U8 inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
 {
-	SerialConfiguration config = SerialConfiguration("COM3", 256000);
-	SerialComms = Serial(config);
+	SerialConfig = SerialConfiguration("COM3", 256000);
+	SerialComms = Serial(SerialConfig);
 	SerialComms.Open();
 }
 
