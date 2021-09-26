@@ -2,9 +2,9 @@
 
 struct Device
 {
-	Device();
-	~Device();
+	Device() {}
+	~Device() {}
 
-	virtual void DrawGUI();
+	virtual void DrawGUI() {}
 };
 

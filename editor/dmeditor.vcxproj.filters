@@ -4,6 +4,9 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{9c2e61ef-0846-4d62-b8bf-af7c8125b71a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DME7000">
+      <UniqueIdentifier>{fa5fbf66-c7a8-44d1-931c-97aa5407e720}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib\imgui\imgui.cpp">
@@ -27,5 +30,38 @@
     <ClCompile Include="lib\imgui\backends\imgui_impl_sdl.cpp">
       <Filter>ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="src\display.cpp" />
+    <ClCompile Include="src\editor.cpp" />
+    <ClCompile Include="src\gui.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\dme7000\dme7000.cpp">
+      <Filter>DME7000</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dme7000\gui_graphic.cpp">
+      <Filter>DME7000</Filter>
+    </ClCompile>
+    <ClCompile Include="src\serial.cpp" />
+    <ClCompile Include="src\serial_win.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\display.h" />
+    <ClInclude Include="src\editor.h" />
+    <ClInclude Include="src\gui.h" />
+    <ClInclude Include="src\device.h" />
+    <ClInclude Include="src\dme7000\dme7000.h">
+      <Filter>DME7000</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dme7000\types.h">
+      <Filter>DME7000</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dme7000\enums.h">
+      <Filter>DME7000</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dme7000\gui_graphic.h">
+      <Filter>DME7000</Filter>
+    </ClInclude>
+    <ClInclude Include="src\serial.h" />
+    <ClInclude Include="src\serial_win.h" />
+    <ClInclude Include="src\serial_macos.h" />
   </ItemGroup>
 </Project>

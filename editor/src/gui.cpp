@@ -1,10 +1,8 @@
 #include "editor.h"
 #include "gui.h"
 
-#include "imgui.h"
-
-GUI::GUI(Editor* editor)
-	: editor(editor)
+GUI::GUI(Editor* inEditor)
+	: editor(inEditor)
 {
 
 }

@@ -8,8 +8,8 @@
 
 struct Editor
 {
-	GUI gui;
 	Display display;
+	GUI gui;
 
 	std::vector<Device*> devices;
 

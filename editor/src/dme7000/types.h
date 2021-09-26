@@ -1,40 +1,42 @@
 #pragma once
 
+#include <array>
+
 #define NAME_NONE "NONE"
+#define U8_MAX 0xFF
 
+typedef signed char    S8;
+typedef unsigned char  U8;
+typedef signed short   S16;
+typedef unsigned short U16;
+typedef float          F32;
 
-typedef signed char		S8;
-typedef unsigned char	U8;
-typedef signed short	S16;
-typedef unsigned short	U16;
-typedef float			F32;
+typedef std::array<U8, 9> Packet;
 
 typedef int ParameterFlags;
 enum ParameterFlags_
 {
 	ParameterFlags_None        = 0,
 	ParameterFlags_Global      = 1 << 0,
-	ParameterFlags_SubPicture  = 2 << 1
+	ParameterFlags_SubPicture  = 1 << 1
 };
 
 struct Parameter 
 {
-	const U8 Module;
-	const U8 Id;
-	const char* Name;
-	const ParameterFlags Flags;
+	const U8 Module = U8_MAX;
+	const U8 Id = U8_MAX;
+	const char* Name = NAME_NONE;
+	const ParameterFlags Flags = 0;
 	
-	virtual unsigned char* GetPacket(const U8 channel) { return nullptr; }
-	virtual unsigned char* GetPacket(const U8 channel, const U8 controlId) { return nullptr; }
+	virtual Packet GetPacket(const U8 channel, size_t& size) const = 0;
+	virtual Packet GetPacket(const U8 channel, const U8 subId, size_t& size) const  = 0;
 
-	Parameter() 
-		: Module(0xFF)
-		, Id(0xFF)
-		, Name(NAME_NONE)
-		, Flags(0)
-	{}
+	bool IsValid() const
+	{
+		return Module != U8_MAX && Id != U8_MAX && Name != NAME_NONE;
+	}
 
-	Parameter(const U8 inModule, const U8 inId, const char* inName, ParameterFlags inFlags = 0) 
+	Parameter(const U8 inModule, const U8 inId, const char* inName, const ParameterFlags inFlags = 0)
 		: Module(inModule) 
 		, Id(inId)
 		, Name(inName)
@@ -44,76 +46,92 @@ struct Parameter
 
 struct Parameter_Bool : public Parameter
 {
-	using Parameter::Parameter;
-
 	bool Value;
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		unsigned char packet[5] = { 0x04, channel, Module, Id, Value };
+		size = 5;
+		Packet packet = { 0x04, channel, Module, Id, Value };
 		return packet;
 	}
 
-	unsigned char* GetPacket(const U8 channel, const U8 controlId) const
+	Packet GetPacket(const U8 channel, const U8 subId, size_t& size) const
 	{
-		unsigned char packet[6] = { 0x05, channel, Module, Id, Value, controlId };
+		size = 6;
+		Packet packet = { 0x05, channel, Module, Id, Value, subId };
 		return packet;
 	}
+
+	using Parameter::Parameter;
 };
 
 struct Parameter_Enum : public Parameter
 {
-	using Parameter::Parameter;
-
 	U8 Value;
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		unsigned char packet[5] = { 0x04, channel, Module, Id, Value };
+		size = 5;
+		Packet packet = { 0x04, channel, Module, Id, Value };
 		return packet;
 	}
 
-	unsigned char* GetPacket(const U8 channel, const U8 controlId) const
+	Packet GetPacket(const U8 channel, const U8 subId, size_t& size) const
 	{
-		unsigned char packet[6] = { 0x05, channel, Module, Id, Value, controlId };
+		size = 6;
+		Packet packet = { 0x05, channel, Module, Id, Value, subId };
 		return packet;
 	}
+
+	using Parameter::Parameter;
 };
 
 struct Parameter_S16 : public Parameter
 {
-	using Parameter::Parameter;
-
 	S16 Value;
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		//char packet[6] = { 0x05, channel, module, id, value };
-		return nullptr;
+		size = 6;
+		Packet packet = { 0x05, channel, Module, Id, (U8)((Value >> 8) & 0xFF), (U8)(Value & 0xFF) };
+		return packet;
 	}
 
-	unsigned char* GetPacket(const U8 channel, const U8 controlId) const
+	Packet GetPacket(const U8 channel, const U8 subId, size_t& size) const
 	{
-		//char packet[7] = { 0x06, channel, module, id, value, controlId };
-		return nullptr;
+		size = 7;
+		Packet packet = { 0x06, channel, Module, Id, (U8)((Value >> 8) & 0xFF), (U8)(Value & 0xFF), subId };
+		return packet;
 	}
+
+	using Parameter::Parameter;
 };
 
 struct Parameter_F32 : public Parameter
 {
-	using Parameter::Parameter;
-
 	F32 Value;
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		return nullptr;
+		U8 valueBytes[4];
+		memcpy(valueBytes, &Value, sizeof(F32));
+
+		size = 8;
+		Packet packet = { 0x07, channel, Module, Id, valueBytes[3], valueBytes[2], valueBytes[1], valueBytes[0] };
+		return packet;
 	}
 
-	unsigned char* GetPacket(const U8 channel, const U8 controlId) const
+	Packet GetPacket(const U8 channel, const U8 subId, size_t& size) const
 	{
-		return nullptr;
+		U8 valueBytes[4];
+		memcpy(valueBytes, &Value, sizeof(F32));
+
+		size = 9;
+		Packet packet = { 0x08, channel, Module, Id, valueBytes[3], valueBytes[2], valueBytes[1], valueBytes[0], subId };
+		return packet;
 	}
+
+	using Parameter::Parameter;
 };
 
 struct Parameter_F32_Light : public Parameter_F32
@@ -125,9 +143,14 @@ struct Parameter_F32_Light : public Parameter_F32
 		, LightId(inLightId)
 	{}
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		return nullptr;
+		U8 valueBytes[4];
+		memcpy(valueBytes, &Value, sizeof(F32));
+
+		size = 9;
+		Packet packet = { 0x08, channel, Module, LightId, Id, valueBytes[3], valueBytes[2], valueBytes[1], valueBytes[0] };
+		return packet;
 	}
 };
 
@@ -140,9 +163,10 @@ struct Parameter_Enum_Video : public Parameter_Enum
 		, SourceId(inSourceId)
 	{}
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		unsigned char packet[7] = { 0x06, channel, Module, Id, SourceId, SourceId, Value };
+		size = 7;
+		Packet packet = { 0x06, channel, Module, Id, SourceId, SourceId, Value };
 		return packet;
 	}
 };
@@ -156,8 +180,10 @@ struct Parameter_S16_Video : public Parameter_S16
 		, SourceId(inSourceId)
 	{}
 
-	unsigned char* GetPacket(const U8 channel) const
+	Packet GetPacket(const U8 channel, size_t& size) const
 	{
-		return nullptr;
+		size = 8;
+		Packet packet = { 0x07, channel, Module, Id, SourceId, SourceId, (U8)((Value >> 8) & 0xFF), (U8)(Value & 0xFF) };
+		return packet;
 	}
 };

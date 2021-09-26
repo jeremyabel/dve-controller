@@ -75,6 +75,33 @@ enum KeyInput
 
 // GENERAL - NON-LINEAR
 
+enum NonLinearEffect
+{
+	NonLinearEffect_Wave           = 101,
+	NonLinearEffect_MosaicGlass    = 102,
+	NonLinearEffect_Flag           = 103,
+	NonLinearEffect_Ripple         = 104,
+	NonLinearEffect_Rings          = 105,
+	NonLinearEffect_BrokenGlass    = 106,
+	NonLinearEffect_FlyingBars     = 107,
+	NonLinearEffect_SplitSlide     = 109,
+	NonLinearEffect_CharacterTrail = 110,
+	NonLinearEffect_Lens           = 112, 
+	NonLinearEffect_Circle         = 113,
+	NonLinearEffect_Panorama       = 114,
+	NonLinearEffect_PageTurn       = 120,
+	NonLinearEffect_Roll           = 121,
+	NonLinearEffect_Cylinder       = 122,
+	NonLinearEffect_Sphere         = 123,
+	NonLinearEffect_Twist          = 131,
+	NonLinearEffect_Explosion      = 132,
+	NonLinearEffect_Swirl          = 133,
+	NonLinearEffect_Blind          = 134,
+	NonLinearEffect_Kaleidoscope   = 135, 
+	NonLinearEffect_MultiMirror    = 136,
+	NonLinearEffect_Melt           = 137
+};
+
 enum NonLinearWaveForm
 {
 	NonLinearWaveForm_Triangle  = 0x02,
@@ -139,11 +166,20 @@ enum BeveledEdgeMode
 
 // 21 INPUT FREEZE
 
+enum InputFreezeEffectType
+{
+	InputFreezeEffectType_HardFreeze,
+	InputFreezeEffectType_LastFreeze,
+	InputFreezeEffectType_TimeStrobe,
+	InputFreezeEffectType_KFStrobe,
+	InputFreezeEffectType_Film
+};
+
 enum InputFreezeMode
 {
 	InputFreezeMode_Frame      = 0x01,
 	InputFreezeMode_TimeStrobe = 0x02,
-	InputFreezeMode_KF_Strobe  = 0x03,
+	InputFreezeMode_KFStrobe   = 0x03,
 	InputFreezeMode_Film       = 0x04
 };
 

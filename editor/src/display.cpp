@@ -7,8 +7,8 @@
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
 
-Display::Display(Editor* editor)
-	: editor(editor)
+Display::Display(Editor* inEditor)
+	: editor(inEditor)
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING) == -1)
 	{

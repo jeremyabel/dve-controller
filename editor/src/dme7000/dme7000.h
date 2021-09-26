@@ -1,21 +1,34 @@
 #pragma once
 
 #include "../device.h"
+#include "../serial.h"
 #include "types.h"
-#include "enums.h"
+#include "gui_graphic.h"
 
-#define PARAM(MODULE, ID, TYPE, NAME) Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME);
-#define PARAM_F(MODULE, ID, FLAGS, TYPE, NAME)  Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME, FLAGS);
+#define PARAM(MODULE, ID, TYPE, NAME)               Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME);
+#define PARAM_FLAGS(MODULE, ID, FLAGS, TYPE, NAME)  Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME, FLAGS);
 #define PARAM_LIGHT(MODULE, LIGHT, ID, TYPE, NAME)  Parameter_ ## TYPE ## _Light NAME = Parameter_ ## TYPE ## _Light(MODULE, LIGHT, ID, #NAME); 
 #define PARAM_VIDEO(MODULE, ID, SOURCE, TYPE, NAME) Parameter_ ## TYPE ## _Video NAME = Parameter_ ## TYPE ## _Video(MODULE, SOURCE, ID, #NAME);
 
-struct DME7000 : public Device
+struct DME7000 : Device
 {
-	DME7000();
+	DME7000(const U8 inChannel = 1);
 	~DME7000();
 
+	const U8 Channel;
+	U8 SubPictureId;
+
+	Serial SerialComms;
+
+	GraphicGUI GraphicGui;
+	// Other GUI classes to arrive later
+
 	void DrawGUI();
-	void OnParameterChanged(Parameter changedParameter);
+	void OnParameterChanged(const Parameter& changedParameter);
+
+	void InputFreeze_Setup(const bool Enabled, const U8 Effect = 0);
+	void RecursiveTrails_Setup(const bool Enabled, const U8 Mode = 0);
+	void NonLinear_Setup(const bool Enabled, const U8 Effect = 0);
 
 	// TODO
 	//  - 38.1 Duality 3D Control
@@ -27,7 +40,7 @@ struct DME7000 : public Device
 	PARAM(0xAD, 0x05, S16,  Background_Color_Sat);
 	PARAM(0xAD, 0x06, S16,  Background_Color_Hue);
 	PARAM(0xAD, 0x07, S16,  Background_Color_Speed);
-	PARAM_F(0xAB, 0x25, ParameterFlags_Global, S16, Background_SuperBlack_Level);
+	PARAM_FLAGS(0xAB, 0x25, ParameterFlags_Global, S16, Background_SuperBlack_Level);
 
 	// 12 BORDER
 	PARAM(0x90, 0x12, Bool, Border_Enable);
@@ -172,7 +185,9 @@ struct DME7000 : public Device
 
 	// 21 INPUT FREEZE
 	PARAM(0x90, 0x30, Bool, InputFreeze_Enable_A);
-	PARAM(0x90, 0x33, Bool, InputFreeze_Enable_B);
+	PARAM(0x90, 0x32, Bool, InputFreeze_Enable_B);
+	PARAM(0x90, 0x33, Bool, InputFreeze_Enable_C);
+	PARAM(0x90, 0x34, Bool, InputFreeze_Enable_D);
 	PARAM(0x92, 0x31, Enum, InputFreeze_Mode_A);
 	PARAM(0x92, 0x34, Enum, InputFreeze_Mode_B);
 	PARAM(0xA3, 0x31, S16,  InputFreeze_TimeStrobe_Duration);
@@ -305,83 +320,83 @@ struct DME7000 : public Device
 	PARAM(0x92, 0xF1, Enum, Duality_Priority);
 
 	// 39.1 SUB PICTURE BORDER
-	PARAM_F(0x91, 0xF1, ParameterFlags_SubPicture, Bool, SubPicture_Border_Enable);
-	PARAM_F(0xA9, 0xE1, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Left);
-	PARAM_F(0xA9, 0xE2, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Right);
-	PARAM_F(0xA9, 0xE3, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Top);
-	PARAM_F(0xA9, 0xE4, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Bottom);
-	PARAM_F(0x92, 0xF0, ParameterFlags_SubPicture, Enum, SubPicture_Border_Source);
-	PARAM_F(0xAD, 0x90, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Lum);
-	PARAM_F(0xAD, 0x91, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Sat);
-	PARAM_F(0xAD, 0x92, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Hue);
-	PARAM_F(0xAD, 0x93, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Speed);
+	PARAM_FLAGS(0x91, 0xF1, ParameterFlags_SubPicture, Bool, SubPicture_Border_Enable);
+	PARAM_FLAGS(0xA9, 0xE1, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Left);
+	PARAM_FLAGS(0xA9, 0xE2, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Right);
+	PARAM_FLAGS(0xA9, 0xE3, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Top);
+	PARAM_FLAGS(0xA9, 0xE4, ParameterFlags_SubPicture, S16,  SubPicture_Border_Width_Bottom);
+	PARAM_FLAGS(0x92, 0xF0, ParameterFlags_SubPicture, Enum, SubPicture_Border_Source);
+	PARAM_FLAGS(0xAD, 0x90, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Lum);
+	PARAM_FLAGS(0xAD, 0x91, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Sat);
+	PARAM_FLAGS(0xAD, 0x92, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Hue);
+	PARAM_FLAGS(0xAD, 0x93, ParameterFlags_SubPicture, S16,  SubPicture_Border_Color_Speed);
 
 	// 39.2 SUB PICTURE CROP
-	PARAM_F(0x91, 0xF2, ParameterFlags_SubPicture, Bool, SubPicture_Crop_Enable);
-	PARAM_F(0xA9, 0xE6, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Left);
-	PARAM_F(0xA9, 0xE7, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Right);
-	PARAM_F(0xA9, 0xE8, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Top);
-	PARAM_F(0xA9, 0xE9, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Bottom);
+	PARAM_FLAGS(0x91, 0xF2, ParameterFlags_SubPicture, Bool, SubPicture_Crop_Enable);
+	PARAM_FLAGS(0xA9, 0xE6, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Left);
+	PARAM_FLAGS(0xA9, 0xE7, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Right);
+	PARAM_FLAGS(0xA9, 0xE8, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Top);
+	PARAM_FLAGS(0xA9, 0xE9, ParameterFlags_SubPicture, S16,  SubPicture_Crop_Bottom);
 
 	// 39.3 SUB PICTURE BEVELED EDGE
-	PARAM_F(0x91, 0xE8, ParameterFlags_SubPicture, Bool, SubPicture_BeveledEdge_Enable);
-	PARAM_F(0x92, 0xF4, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Pattern);
-	PARAM_F(0x92, 0xF5, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Mode);
-	PARAM_F(0xA9, 0xF0, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Width_H);
-	PARAM_F(0xA9, 0xF1, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Width_V);
-	PARAM_F(0x91, 0xE9, ParameterFlags_SubPicture, Bool, SubPicture_BeveledEdge_Softness_Enable);
-	PARAM_F(0xA9, 0xF2, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Softness_Inner);
-	PARAM_F(0xA9, 0xF3, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Softness_Bound);
-	PARAM_F(0xA9, 0xF4, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Left);
-	PARAM_F(0xA9, 0xF5, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Right);
-	PARAM_F(0xA9, 0xF6, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Top);
-	PARAM_F(0xA9, 0xF7, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Bottom);
-	PARAM_F(0xA9, 0xF8, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Mix_Gain);
-	PARAM_F(0x92, 0xF6, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Source);
-	PARAM_F(0xAD, 0x98, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Lum);
-	PARAM_F(0xAD, 0x99, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Sat);
-	PARAM_F(0xAD, 0x9A, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Hue);
-	PARAM_F(0xAD, 0x9B, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Speed);
-	PARAM_F(0xAD, 0x9C, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Lum);
-	PARAM_F(0xAD, 0x9D, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Sat);
-	PARAM_F(0xAD, 0x9E, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Hue);
-	PARAM_F(0xAD, 0x9F, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Speed);
-	PARAM_F(0xAD, 0xA0, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Lum);
-	PARAM_F(0xAD, 0xA1, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Sat);
-	PARAM_F(0xAD, 0xA2, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Hue);
-	PARAM_F(0xAD, 0xA3, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Speed);
-	PARAM_F(0xAD, 0xA4, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Lum);
-	PARAM_F(0xAD, 0xA5, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Sat);
-	PARAM_F(0xAD, 0xA6, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Hue);
-	PARAM_F(0xAD, 0xA7, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Speed);
+	PARAM_FLAGS(0x91, 0xE8, ParameterFlags_SubPicture, Bool, SubPicture_BeveledEdge_Enable);
+	PARAM_FLAGS(0x92, 0xF4, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Pattern);
+	PARAM_FLAGS(0x92, 0xF5, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Mode);
+	PARAM_FLAGS(0xA9, 0xF0, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Width_H);
+	PARAM_FLAGS(0xA9, 0xF1, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Width_V);
+	PARAM_FLAGS(0x91, 0xE9, ParameterFlags_SubPicture, Bool, SubPicture_BeveledEdge_Softness_Enable);
+	PARAM_FLAGS(0xA9, 0xF2, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Softness_Inner);
+	PARAM_FLAGS(0xA9, 0xF3, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Softness_Bound);
+	PARAM_FLAGS(0xA9, 0xF4, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Left);
+	PARAM_FLAGS(0xA9, 0xF5, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Right);
+	PARAM_FLAGS(0xA9, 0xF6, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Top);
+	PARAM_FLAGS(0xA9, 0xF7, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Intensity_Bottom);
+	PARAM_FLAGS(0xA9, 0xF8, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Mix_Gain);
+	PARAM_FLAGS(0x92, 0xF6, ParameterFlags_SubPicture, Enum, SubPicture_BeveledEdge_Source);
+	PARAM_FLAGS(0xAD, 0x98, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Lum);
+	PARAM_FLAGS(0xAD, 0x99, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Sat);
+	PARAM_FLAGS(0xAD, 0x9A, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Hue);
+	PARAM_FLAGS(0xAD, 0x9B, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Left_Color_Speed);
+	PARAM_FLAGS(0xAD, 0x9C, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Lum);
+	PARAM_FLAGS(0xAD, 0x9D, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Sat);
+	PARAM_FLAGS(0xAD, 0x9E, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Hue);
+	PARAM_FLAGS(0xAD, 0x9F, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Right_Color_Speed);
+	PARAM_FLAGS(0xAD, 0xA0, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Lum);
+	PARAM_FLAGS(0xAD, 0xA1, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Sat);
+	PARAM_FLAGS(0xAD, 0xA2, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Hue);
+	PARAM_FLAGS(0xAD, 0xA3, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Top_Color_Speed);
+	PARAM_FLAGS(0xAD, 0xA4, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Lum);
+	PARAM_FLAGS(0xAD, 0xA5, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Sat);
+	PARAM_FLAGS(0xAD, 0xA6, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Hue);
+	PARAM_FLAGS(0xAD, 0xA7, ParameterFlags_SubPicture, S16,  SubPicture_BeveledEdge_Bottom_Color_Speed);
 
 	// 39.5 SUB PICTURE POSTER & NEGATIVE
-	PARAM_F(0x91, 0xE0, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Posterization_Enable);
-	PARAM_F(0xA9, 0xDC, ParameterFlags_SubPicture, S16,  SubPicture_PosterNegative_Posterization_Value);
-	PARAM_F(0x91, 0xE1, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Solarization_Enable);
-	PARAM_F(0xA9, 0xDD, ParameterFlags_SubPicture, S16,  SubPicture_PosterNegative_Solarization_Value);
-	PARAM_F(0x91, 0xE2, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Negative_Y_Enable);
-	PARAM_F(0x91, 0xE3, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Negative_C_Enable);
+	PARAM_FLAGS(0x91, 0xE0, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Posterization_Enable);
+	PARAM_FLAGS(0xA9, 0xDC, ParameterFlags_SubPicture, S16,  SubPicture_PosterNegative_Posterization_Value);
+	PARAM_FLAGS(0x91, 0xE1, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Solarization_Enable);
+	PARAM_FLAGS(0xA9, 0xDD, ParameterFlags_SubPicture, S16,  SubPicture_PosterNegative_Solarization_Value);
+	PARAM_FLAGS(0x91, 0xE2, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Negative_Y_Enable);
+	PARAM_FLAGS(0x91, 0xE3, ParameterFlags_SubPicture, Bool, SubPicture_PosterNegative_Negative_C_Enable);
 
 	// 39.6 SUB PICTURE SEPIA & MONO
-	PARAM_F(0x91, 0xE4, ParameterFlags_SubPicture, Bool, SubPicture_SepiaMono_Sepia_Enable);
-	PARAM_F(0xA9, 0xDE, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Sepia_Y);
-	PARAM_F(0xA9, 0xDF, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Sepia_C);
-	PARAM_F(0x92, 0xF3, ParameterFlags_SubPicture, Enum, SubPicture_SepiaMono_Source);
-	PARAM_F(0xAD, 0x94, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Lum);
-	PARAM_F(0xAD, 0x95, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Sat);
-	PARAM_F(0xAD, 0x96, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Hue);
-	PARAM_F(0xAD, 0x97, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Speed);
-	PARAM_F(0x91, 0xE5, ParameterFlags_SubPicture, Bool, SubPicture_SepiaMono_Mono_Enable);
+	PARAM_FLAGS(0x91, 0xE4, ParameterFlags_SubPicture, Bool, SubPicture_SepiaMono_Sepia_Enable);
+	PARAM_FLAGS(0xA9, 0xDE, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Sepia_Y);
+	PARAM_FLAGS(0xA9, 0xDF, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Sepia_C);
+	PARAM_FLAGS(0x92, 0xF3, ParameterFlags_SubPicture, Enum, SubPicture_SepiaMono_Source);
+	PARAM_FLAGS(0xAD, 0x94, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Lum);
+	PARAM_FLAGS(0xAD, 0x95, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Sat);
+	PARAM_FLAGS(0xAD, 0x96, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Hue);
+	PARAM_FLAGS(0xAD, 0x97, ParameterFlags_SubPicture, S16,  SubPicture_SepiaMono_Color_Speed);
+	PARAM_FLAGS(0x91, 0xE5, ParameterFlags_SubPicture, Bool, SubPicture_SepiaMono_Mono_Enable);
 
 	// 39.7 SUB PICTURE CONTRAST
-	PARAM_F(0x91, 0xE6, ParameterFlags_SubPicture, Bool, SubPicture_Contrast_Y_Enable);
-	PARAM_F(0xA9, 0xF9, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Clip);
-	PARAM_F(0xA9, 0xFA, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Gain);
-	PARAM_F(0xA9, 0xFB, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Offset);
-	PARAM_F(0x91, 0xE7, ParameterFlags_SubPicture, Bool, SubPicture_Contrast_C_Enable);
-	PARAM_F(0xA9, 0xFC, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_C_Gain);
-	PARAM_F(0xA9, 0xFD, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_C_Offset);
+	PARAM_FLAGS(0x91, 0xE6, ParameterFlags_SubPicture, Bool, SubPicture_Contrast_Y_Enable);
+	PARAM_FLAGS(0xA9, 0xF9, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Clip);
+	PARAM_FLAGS(0xA9, 0xFA, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Gain);
+	PARAM_FLAGS(0xA9, 0xFB, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_Y_Offset);
+	PARAM_FLAGS(0x91, 0xE7, ParameterFlags_SubPicture, Bool, SubPicture_Contrast_C_Enable);
+	PARAM_FLAGS(0xA9, 0xFC, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_C_Gain);
+	PARAM_FLAGS(0xA9, 0xFD, ParameterFlags_SubPicture, S16,  SubPicture_Contrast_C_Offset);
 
 	// 41 POSTER & NEGATIVE
 	PARAM(0x90, 0x65, Bool, PosterNegative_Posterization_Enable);
@@ -608,8 +623,8 @@ struct DME7000 : public Device
 	// 57 EXT VIDEO
 	PARAM_VIDEO(0xA0, 0x01, 0x3F, Enum, ExtVideo_TBC_Center);
 	PARAM_VIDEO(0xA3, 0x01, 0x3F, S16,  ExtVideo_Input_Phase);
-	PARAM_F(0xA8, 0x0B, ParameterFlags_Global, Enum, ExtVideo_Output_Source);
-	PARAM_F(0xAB, 0x26, ParameterFlags_Global, S16,  ExtVideo_Output_Phase);
+	PARAM_FLAGS(0xA8, 0x0B, ParameterFlags_Global, Enum, ExtVideo_Output_Source);
+	PARAM_FLAGS(0xAB, 0x26, ParameterFlags_Global, S16,  ExtVideo_Output_Phase);
 	PARAM(0x91, 0xFA, Bool, ExtVideo_Separate_Side);
 
 	// 101 WAVE
@@ -994,26 +1009,26 @@ struct DME7000 : public Device
 	PARAM(0xA9, 0x11, S16,  TargetSpotlight_Offset);
 
 	// 715 OUTPUT CONTROL
-	PARAM_F(0xA8, 0x40, ParameterFlags_Global, Enum, OutputControl_Analog_Signal);
-	PARAM_F(0xA8, 0x42, ParameterFlags_Global, Enum, OutputControl_Rounding_Video);
-	PARAM_F(0xA8, 0x43, ParameterFlags_Global, Enum, OutputControl_Rounding_Key);
-	PARAM_F(0xA8, 0x44, ParameterFlags_Global, Enum, OutputControl_V_Phase);
-	PARAM_F(0xAB, 0x21, ParameterFlags_Global, S16,  OutputControl_H_Phase_Video);
-	PARAM_F(0xAB, 0x22, ParameterFlags_Global, S16,  OutputControl_H_Phase_Key);
-	PARAM_F(0xA8, 0x49, ParameterFlags_Global, Enum, OutputControl_Blanking);
+	PARAM_FLAGS(0xA8, 0x40, ParameterFlags_Global, Enum, OutputControl_Analog_Signal);
+	PARAM_FLAGS(0xA8, 0x42, ParameterFlags_Global, Enum, OutputControl_Rounding_Video);
+	PARAM_FLAGS(0xA8, 0x43, ParameterFlags_Global, Enum, OutputControl_Rounding_Key);
+	PARAM_FLAGS(0xA8, 0x44, ParameterFlags_Global, Enum, OutputControl_V_Phase);
+	PARAM_FLAGS(0xAB, 0x21, ParameterFlags_Global, S16,  OutputControl_H_Phase_Video);
+	PARAM_FLAGS(0xAB, 0x22, ParameterFlags_Global, S16,  OutputControl_H_Phase_Key);
+	PARAM_FLAGS(0xA8, 0x49, ParameterFlags_Global, Enum, OutputControl_Blanking);
 
 	// 716 PROCESS CONTROL
-	PARAM_F(0xA8, 0x18, ParameterFlags_Global, Enum, ProcessControl_Filter_Mode);
-	PARAM_F(0xA8, 0x60, ParameterFlags_Global, Enum, ProcessControl_Filter_Type);
-	PARAM_F(0xA8, 0x41, ParameterFlags_Global, Bool, ProcessControl_Limiter_Video);
-	PARAM_F(0xA8, 0x16, ParameterFlags_Global, Bool, ProcessControl_Limiter_Matte);
-	PARAM_F(0xAB, 0x02, ParameterFlags_Global, S16,  ProcessControl_Matte_Lum_Max);
-	PARAM_F(0xAB, 0x20, ParameterFlags_Global, S16,  ProcessControl_White_Clip);
-	PARAM_F(0xAB, 0x24, ParameterFlags_Global, S16,  ProcessControl_Dark_Clip);
-	PARAM_F(0xA8, 0x45, ParameterFlags_Global, Enum, ProcessControl_External_Key);
-	PARAM_F(0xA8, 0x46, ParameterFlags_Global, Enum, ProcessControl_Key_Filter);
-	PARAM_F(0xA8, 0x47, ParameterFlags_Global, Enum, ProcessControl_Analog_External_Key);
-	PARAM_F(0xA8, 0x4A, ParameterFlags_Global, Enum, ProcessControl_Adaptive_Mode);
+	PARAM_FLAGS(0xA8, 0x18, ParameterFlags_Global, Enum, ProcessControl_Filter_Mode);
+	PARAM_FLAGS(0xA8, 0x60, ParameterFlags_Global, Enum, ProcessControl_Filter_Type);
+	PARAM_FLAGS(0xA8, 0x41, ParameterFlags_Global, Bool, ProcessControl_Limiter_Video);
+	PARAM_FLAGS(0xA8, 0x16, ParameterFlags_Global, Bool, ProcessControl_Limiter_Matte);
+	PARAM_FLAGS(0xAB, 0x02, ParameterFlags_Global, S16,  ProcessControl_Matte_Lum_Max);
+	PARAM_FLAGS(0xAB, 0x20, ParameterFlags_Global, S16,  ProcessControl_White_Clip);
+	PARAM_FLAGS(0xAB, 0x24, ParameterFlags_Global, S16,  ProcessControl_Dark_Clip);
+	PARAM_FLAGS(0xA8, 0x45, ParameterFlags_Global, Enum, ProcessControl_External_Key);
+	PARAM_FLAGS(0xA8, 0x46, ParameterFlags_Global, Enum, ProcessControl_Key_Filter);
+	PARAM_FLAGS(0xA8, 0x47, ParameterFlags_Global, Enum, ProcessControl_Analog_External_Key);
+	PARAM_FLAGS(0xA8, 0x4A, ParameterFlags_Global, Enum, ProcessControl_Adaptive_Mode);
 	PARAM( 0x90, 0x53, Bool, ProcessControl_Wrap_Around);
 
 	// TRANSFORM
@@ -1100,6 +1115,7 @@ struct DME7000 : public Device
 	PARAM(0xA5, 0x56, S16,  RandomColor_TileSize_V);
 
 	// NON-LINEAR SETUP
+	PARAM(0x90, 0xA0, Bool, NonLinear_Enable);
 	PARAM(0x92, 0xA0, Enum, NonLinear_Setup_1);
 	PARAM(0x92, 0xC8, Enum, NonLinear_Setup_2);
 
@@ -1153,19 +1169,4 @@ struct DME7000 : public Device
 	PARAM(0xA9, 0x23, S16,  PatternModify_Spring_Amount);
 	PARAM(0x90, 0x87, Bool, PatternModify_Spiral_Enable);
 	PARAM(0xA9, 0x24, S16,  PatternModify_Spiral_Amount);
-
-	/* SPECIAL PARAMETERS:
-     * 
-	 *  17 COLOR MIX - Pattern Number
-	 *  21 INPUT FREEZE - Enable & Mode
-	 *  101 WAVE - Mode - 3 Bool packets w/ custom logic
-	 *  101 WAVE - Lock - 2 Bool packets ""
-	 *  111 MIRROR - Mirror - S16, 1 packet w/ custom logic
-	 *  112 LENS - Mode - 2 packets w/ custom logic
-	 *  201 GRAPHIC SETUP - User Defined Mode - S16, 1 packet w/ custom logic
-	 *  202 GRAPHIC CONTROL - All - ""
-	 *  203 GRAPHIC 3D SHADOW - All - ""
-	 *  204 GRAPHIC SUB PICTURE - All - ""
-	 * 
-	*/
 };
