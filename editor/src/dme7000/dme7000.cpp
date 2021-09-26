@@ -8,10 +8,9 @@ DME7000::DME7000(const U8 inChannel)
 	: Channel(inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
- // @QUESTION: If I try and do this in the function body (after removing the empty copy constructor code in the header file), 
-	                                                                          // all the memory has been freed already and it will throw an exception. Why?
 {
-	SerialComms = Serial("COM3", 256000);
+	SerialConfiguration config = SerialConfiguration("COM3", 256000);
+	SerialComms = Serial(config);
 	SerialComms.Open();
 }
 
@@ -43,17 +42,13 @@ void DME7000::OnParameterChanged(const Parameter& changedParameter)
 		size_t size;
 		Packet packet;
 		
-		if (changedParameter.Flags & ParameterFlags_Global)
-		{
+		if (changedParameter.Flags & ParameterFlags_Global) {
 			outChannel = 0x80;
 		}
 
-		if (changedParameter.Flags & ParameterFlags_SubPicture)
-		{
+		if (changedParameter.Flags & ParameterFlags_SubPicture) {
 			changedParameter.GetPacket(outChannel, SubPictureId, size);
-		}
-		else
-		{
+		} else {
 			changedParameter.GetPacket(outChannel, size);
 		}
 

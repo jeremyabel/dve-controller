@@ -21,7 +21,6 @@ struct DME7000 : Device
 	Serial SerialComms;
 
 	GraphicGUI GraphicGui;
-	// Other GUI classes to arrive later
 
 	void DrawGUI();
 	void OnParameterChanged(const Parameter& changedParameter);

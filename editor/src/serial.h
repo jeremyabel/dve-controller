@@ -28,16 +28,36 @@ enum SerialFlowControl
 	SerialFlowControl_Hardware
 };
 
+struct SerialConfiguration
+{
+	const char* Port = "";
+	uint32_t BaudRate = 9600;
+	uint8_t ByteSize = 8;
+	SerialParity Parity = SerialParity_None;
+	SerialStopBits StopBits = SerialStopBits_1;
+	SerialFlowControl FlowControl = SerialFlowControl_None;
+	
+	SerialConfiguration() {}
+	SerialConfiguration(const char* inPort,
+		uint32_t inBaudRate = 9600,
+		uint8_t inByteSize = 8,
+		SerialParity inParity = SerialParity_None,
+		SerialStopBits inStopBits = SerialStopBits_1,
+		SerialFlowControl inFlowControl = SerialFlowControl_None)
+		: Port(inPort)
+		, BaudRate(inBaudRate)
+		, Parity(inParity)
+		, StopBits(inStopBits)
+		, FlowControl(inFlowControl)
+	{}
+};
+
 class Serial 
 {
 public:
 
-	Serial(const char* port = "",
-		uint32_t baudRate = 9600,
-		uint8_t byteSize = 8,
-		SerialParity parity = SerialParity_None,
-		SerialStopBits stopBits = SerialStopBits_1,
-		SerialFlowControl flowControl = SerialFlowControl_None);
+	Serial() : IsOpen(false) {}
+	Serial(const SerialConfiguration config);
 
 	virtual ~Serial();
 
@@ -55,15 +75,10 @@ public:
 	void FlushInput();
 	void FlushOutput();
 
-	unsigned long     BaudRate;
-	uint8_t           ByteSize;
-	SerialParity      Parity;
-	SerialStopBits    StopBits;
-	SerialFlowControl FlowControl;
+	SerialConfiguration Config;
 
 private:
 
-	const char* Port;
 	bool IsOpen;
 
 #if _WIN32
