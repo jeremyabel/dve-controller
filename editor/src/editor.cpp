@@ -6,7 +6,10 @@ Editor::Editor()
 	: EditorDisplay(this)
 	, EditorGUI(this)
 {
-	Devices.emplace_back(new DME7000());
+	SerialComms = Serial();
+	SerialComms.Open();
+
+	Devices.emplace_back(new DME7000(this));
 }
 
 Editor::~Editor()

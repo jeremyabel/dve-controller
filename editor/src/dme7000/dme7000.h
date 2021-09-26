@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../device.h"
-#include "../serial.h"
 #include "types.h"
 #include "gui_graphic.h"
 
@@ -10,16 +9,17 @@
 #define PARAM_LIGHT(MODULE, LIGHT, ID, TYPE, NAME)  Parameter_ ## TYPE ## _Light NAME = Parameter_ ## TYPE ## _Light(MODULE, LIGHT, ID, #NAME); 
 #define PARAM_VIDEO(MODULE, ID, SOURCE, TYPE, NAME) Parameter_ ## TYPE ## _Video NAME = Parameter_ ## TYPE ## _Video(MODULE, SOURCE, ID, #NAME);
 
+struct Editor;
+
 struct DME7000 : Device
 {
-	DME7000(const U8 inChannel = 1);
+	DME7000(Editor* inEditor, const U8 inChannel = 1);
 	~DME7000();
+
+	Editor* EditorRef;
 
 	const U8 Channel;
 	U8 SubPictureId;
-
-	Serial SerialComms;
-	SerialConfiguration SerialConfig;
 
 	GraphicGUI GraphicGui;
 

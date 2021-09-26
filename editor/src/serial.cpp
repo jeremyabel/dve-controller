@@ -5,15 +5,16 @@
 #include <windows.h>
 #elif __APPLE__
 #include <fcntl.h>
+#include <ioctl.h>
+#include <termios.h>
+#include <unistd.h>
 #include <errno.h>
-#include <sys/ioctl.h>
 #endif
 
 #include "serial.h"
 
-Serial::Serial(const SerialConfiguration inConfig)
-	: Config(inConfig)
-	, IsOpen(false)
+Serial::Serial()
+	: IsOpen(false)
 {}
 
 Serial::~Serial()
@@ -24,10 +25,10 @@ Serial::~Serial()
 void Serial::Open()
 {
 #if _WIN32
-	FileHandle = CreateFileA(Config.Port, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	FileHandle = CreateFileA("COM3", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	assert(FileHandle != INVALID_HANDLE_VALUE);
 #elif __APPLE__
-	FileHandle = ::open(Port, O_RDWR | O_NOCTTY | O_NONBLOCK);
+	FileHandle = open("COM3", O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (FileHandle == -1 && errno == EINTR) {
 		// Recurse, this just means the request was interrupted
 		Open();
@@ -50,7 +51,7 @@ void Serial::Close()
 		FileHandle = INVALID_HANDLE_VALUE;
 #elif __APPLE__
 		assert(FileHandle != -1);
-		::close(FileHandle);
+		close(FileHandle);
 		FileHandle = -1;
 #endif
 
@@ -65,49 +66,15 @@ void Serial::Reset()
 
 	DCB dcbSerialParams = { 0 };
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
-
-	// Setup baud rate
-	dcbSerialParams.BaudRate = Config.BaudRate;
-
-	// Setup stop bits
-	switch (Config.StopBits)
-	{
-		case SerialStopBits_1:   dcbSerialParams.StopBits = ONESTOPBIT; break;
-		case SerialStopBits_2:   dcbSerialParams.StopBits = TWOSTOPBITS; break;
-		case SerialStopBits_1_5: dcbSerialParams.StopBits = ONE5STOPBITS; break;
-	}
-
-	// Setup parity
-	switch (Config.Parity)
-	{
-		case SerialParity_None: dcbSerialParams.Parity = NOPARITY; break;
-		case SerialParity_Even: dcbSerialParams.Parity = EVENPARITY; break;
-		case SerialParity_Odd:  dcbSerialParams.Parity = ODDPARITY; break;
-	}
-
-	// Setup flow control
-	if (Config.FlowControl == SerialFlowControl_None)
-	{
-		dcbSerialParams.fOutxCtsFlow = false;
-		dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
-		dcbSerialParams.fOutX = false;
-		dcbSerialParams.fInX = false;
-	}
-	else if (Config.FlowControl == SerialFlowControl_Software)
-	{
-		dcbSerialParams.fOutxCtsFlow = false;
-		dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
-		dcbSerialParams.fOutX = true;
-		dcbSerialParams.fInX = true;
-	}
-	else if (Config.FlowControl == SerialFlowControl_Hardware)
-	{
-		dcbSerialParams.fOutxCtsFlow = true;
-		dcbSerialParams.fRtsControl = RTS_CONTROL_HANDSHAKE;
-		dcbSerialParams.fOutX = false;
-		dcbSerialParams.fInX = false;
-	}
-
+	dcbSerialParams.BaudRate = 256000;
+	dcbSerialParams.ByteSize = 8;
+	dcbSerialParams.StopBits = ONESTOPBIT;
+	dcbSerialParams.Parity = NOPARITY;
+	dcbSerialParams.fOutxCtsFlow = false;
+	dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
+	dcbSerialParams.fOutX = false;
+	dcbSerialParams.fInX = false;
+	
 	// Setup timeouts
 	COMMTIMEOUTS timeouts = { 0 };
 	timeouts.ReadIntervalTimeout = UINT32_MAX;
@@ -116,13 +83,27 @@ void Serial::Reset()
 	timeouts.WriteTotalTimeoutConstant = 1000;
 	timeouts.WriteTotalTimeoutMultiplier = 0;
 
-	// Activate timeouts
+	// Apply settings
 	SetCommTimeouts(FileHandle, &timeouts);
-
-	// Activate settings
 	SetCommState(FileHandle, &dcbSerialParams);
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+	assert(FileHandle != -1);
+
+	struct termios options;
+	tcgetattr(FileHandle, &options);
+
+	// Setup baud rate
+	ioctl(FileHandle, IOSSIOSPEED, 256000, 1);
+
+	// Setup flags
+	options.c_iflag &= (tcflag_t) ~(INLCR | IGNCR | ICRNL | IGNBRK);
+	options.c_oflag &= (tcflag_t) ~(OPOST | ONLCR | OCRNL);
+	options.c_lflag &= (tcflag_t) ~(PARENB | PARODD | CSTOPB | CSIZE | CRTSCTS);
+	options.c_cflag |= (tcflag_t) (CLOCAL | CREAD | CS8);
+	options.c_lflag &= (tcflag_t) ~(ICANON | ISIG | ECHO);
+
+	// Apply settings
+	tcsetattr(FileHandle, TCSANOW, &options);
 #endif
 }
 
@@ -149,7 +130,7 @@ size_t Serial::Read(uint8_t* buffer, size_t size)
 	DWORD bytesRead;
 	ReadFile(FileHandle, buffer, static_cast<DWORD>(size), &bytesRead, NULL);
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+	size_t bytesRead = read(FileHandle, buffer, size);
 #endif
 
 	return (size_t)bytesRead;
@@ -163,7 +144,7 @@ size_t Serial::Write(const uint8_t* data, size_t size)
 	DWORD bytesWritten;
 	WriteFile(FileHandle, data, static_cast<DWORD>(size), &bytesWritten, NULL);
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+	size_t bytesWritten = write(FileHandle, data, size);
 #endif
 
 	return (size_t)bytesWritten;

@@ -1,22 +1,20 @@
 #include <stdio.h>
 
+#include "../editor.h"
 #include "dme7000.h"
 #include "enums.h"
 #include "imgui.h"
 
-DME7000::DME7000(const U8 inChannel) 
-	: Channel(inChannel)
+DME7000::DME7000(Editor* inEditor, const U8 inChannel) 
+	: EditorRef(inEditor)
+	, Channel(inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
-{
-	SerialConfig = SerialConfiguration("COM3", 256000);
-	SerialComms = Serial(SerialConfig);
-	SerialComms.Open();
-}
+{}
 
 DME7000::~DME7000()
 {
-	SerialComms.Close();
+
 }
 
 void DME7000::DrawGUI()
@@ -34,7 +32,6 @@ void DME7000::DrawGUI()
 	}
 
 	ImGui::End();
-	
 }
 
 void DME7000::OnParameterChanged(const Parameter& changedParameter)
@@ -55,7 +52,7 @@ void DME7000::OnParameterChanged(const Parameter& changedParameter)
 			changedParameter.GetPacket(outChannel, size);
 		}
 
-		size_t bytesWritten = SerialComms.Write(&packet[0], packet.size());
+		size_t bytesWritten = EditorRef->SerialComms.Write(&packet[0], packet.size());
 
 		printf("Parameter changed: %s %d bytes, wrote %d bytes\n", changedParameter.Name, size, bytesWritten);
 	}
