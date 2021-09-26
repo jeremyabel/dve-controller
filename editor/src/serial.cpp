@@ -1,4 +1,4 @@
-#include <limits>
+#include <assert.h>
 
 #if _WIN32
 #define NOMINMAX
@@ -25,6 +25,7 @@ void Serial::Open()
 {
 #if _WIN32
 	FileHandle = CreateFileA(Config.Port, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	assert(FileHandle != INVALID_HANDLE_VALUE);
 #elif __APPLE__
 	FileHandle = ::open(Port, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (FileHandle == -1 && errno == EINTR) {
@@ -32,6 +33,7 @@ void Serial::Open()
 		Open();
 		return;
 	}
+	assert(FileHandle != -1);
 #endif
 
 	Reset();
@@ -43,9 +45,11 @@ void Serial::Close()
 	if (IsOpen)
 	{
 #if _WIN32
+		assert(FileHandle != INVALID_HANDLE_VALUE);
 		CloseHandle(FileHandle);
 		FileHandle = INVALID_HANDLE_VALUE;
 #elif __APPLE__
+		assert(FileHandle != -1);
 		::close(FileHandle);
 		FileHandle = -1;
 #endif
@@ -57,6 +61,8 @@ void Serial::Close()
 void Serial::Reset()
 {
 #if _WIN32
+	assert(FileHandle != INVALID_HANDLE_VALUE);
+
 	DCB dcbSerialParams = { 0 };
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 
@@ -104,7 +110,7 @@ void Serial::Reset()
 
 	// Setup timeouts
 	COMMTIMEOUTS timeouts = { 0 };
-	timeouts.ReadIntervalTimeout = std::numeric_limits<uint32_t>::max();
+	timeouts.ReadIntervalTimeout = UINT32_MAX;
 	timeouts.ReadTotalTimeoutConstant = 1000;
 	timeouts.ReadTotalTimeoutMultiplier = 0;
 	timeouts.WriteTotalTimeoutConstant = 1000;
@@ -122,6 +128,8 @@ void Serial::Reset()
 
 size_t Serial::GetAvailableBufferSize()
 {
+	assert(IsOpen);
+
 #if _WIN32
 	COMSTAT commStats;
 	ClearCommError(FileHandle, NULL, &commStats);
@@ -135,6 +143,8 @@ size_t Serial::GetAvailableBufferSize()
 
 size_t Serial::Read(uint8_t* buffer, size_t size)
 {
+	assert(IsOpen);
+
 #if _WIN32
 	DWORD bytesRead;
 	ReadFile(FileHandle, buffer, static_cast<DWORD>(size), &bytesRead, NULL);
@@ -147,6 +157,8 @@ size_t Serial::Read(uint8_t* buffer, size_t size)
 
 size_t Serial::Write(const uint8_t* data, size_t size)
 {
+	assert(IsOpen);
+
 #if _WIN32
 	DWORD bytesWritten;
 	WriteFile(FileHandle, data, static_cast<DWORD>(size), &bytesWritten, NULL);
@@ -159,6 +171,8 @@ size_t Serial::Write(const uint8_t* data, size_t size)
 
 void Serial::Flush()
 {
+	assert(IsOpen);
+
 #if _WIN32
 	FlushFileBuffers(FileHandle);
 #elif __APPLE__
@@ -168,6 +182,8 @@ void Serial::Flush()
 
 void Serial::FlushInput()
 {
+	assert(IsOpen);
+
 #if _WIN32
 	PurgeComm(FileHandle, PURGE_RXCLEAR);
 #elif __APPLE__
@@ -177,6 +193,8 @@ void Serial::FlushInput()
 
 void Serial::FlushOutput()
 {
+	assert(IsOpen);
+
 #if _WIN32
 	PurgeComm(FileHandle, PURGE_TXCLEAR);
 #elif __APPLE__

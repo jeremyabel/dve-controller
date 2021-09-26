@@ -1,4 +1,4 @@
-#include <iostream>
+#include <assert.h>
 
 #include "editor.h"
 #include "display.h"
@@ -12,7 +12,7 @@ Display::Display(Editor* inEditor)
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING) == -1)
 	{
-		std::cerr << "Failed to initialize SDL.\n";
+		assert("Failed to initialize SDL.");
 		exit(1);
 	}
 
@@ -79,7 +79,9 @@ void Display::Render()
 	// Render the user interface
 	EditorRef->EditorGUI.Render();
 
+	// @TODO: Store this as a member variable?
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
 	ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	// Rendering
