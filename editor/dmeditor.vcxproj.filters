@@ -41,7 +41,6 @@
       <Filter>DME7000</Filter>
     </ClCompile>
     <ClCompile Include="src\serial.cpp" />
-    <ClCompile Include="src\serial_win.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\display.h" />
@@ -61,7 +60,5 @@
       <Filter>DME7000</Filter>
     </ClInclude>
     <ClInclude Include="src\serial.h" />
-    <ClInclude Include="src\serial_win.h" />
-    <ClInclude Include="src\serial_macos.h" />
   </ItemGroup>
 </Project>

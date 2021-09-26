@@ -33,7 +33,6 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\display.cpp" />
     <ClCompile Include="src\serial.cpp" />
-    <ClCompile Include="src\serial_win.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\device.h" />
@@ -45,8 +44,6 @@
     <ClInclude Include="src\gui.h" />
     <ClInclude Include="src\display.h" />
     <ClInclude Include="src\serial.h" />
-    <ClInclude Include="src\serial_macos.h" />
-    <ClInclude Include="src\serial_win.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

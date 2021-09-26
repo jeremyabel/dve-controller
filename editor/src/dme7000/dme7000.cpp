@@ -8,9 +8,10 @@ DME7000::DME7000(const U8 inChannel)
 	: Channel(inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
-	, SerialComms(Serial("COM3", 256000, SerialTimeout::simpleTimeout(1000))) // @QUESTION: If I try and do this in the function body (after removing the empty copy constructor code in the header file), 
+ // @QUESTION: If I try and do this in the function body (after removing the empty copy constructor code in the header file), 
 	                                                                          // all the memory has been freed already and it will throw an exception. Why?
 {
+	SerialComms = Serial("COM3", 256000);
 	SerialComms.Open();
 }
 
@@ -56,9 +57,9 @@ void DME7000::OnParameterChanged(const Parameter& changedParameter)
 			changedParameter.GetPacket(outChannel, size);
 		}
 
-		SerialComms.Write(&packet[0], packet.size());
+		size_t bytesWritten = SerialComms.Write(&packet[0], packet.size());
 
-		printf("Parameter changed: %s %d bytes\n", changedParameter.Name, size);
+		printf("Parameter changed: %s %d bytes, wrote %d bytes\n", changedParameter.Name, size, bytesWritten);
 	}
 }
 

@@ -1,13 +1,11 @@
 #pragma once
 
-#include <limits>
-#include <vector>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <exception>
-#include <stdexcept>
 #include <stdint.h>
+
+#if _WIN32
+#define NOMINMAX
+#include "windows.h" // @TODO: Optimize this from Aras's article
+#endif
 
 enum SerialStopBits
 {
@@ -30,45 +28,12 @@ enum SerialFlowControl
 	SerialFlowControl_Hardware
 };
 
-struct SerialTimeout
-{
-// @QUESTION: This looks gross? Is it?
-#ifdef max
-#undef max
-#endif
-	static uint32_t max() { return std::numeric_limits<uint32_t>::max(); }
-
-	static SerialTimeout simpleTimeout(uint32_t timeout)
-	{
-		return SerialTimeout(SerialTimeout::max(), timeout, 0, timeout, 0);
-	}
-
-	uint32_t interByteTimeout;
-	uint32_t readTimeoutConstant;
-	uint32_t readTimeoutMultiplier;
-	uint32_t writeTimeoutConstant;
-	uint32_t writeTimeoutMultiplier;
-
-	explicit SerialTimeout(uint32_t inInterByteTimeout = 0,
-		uint32_t inReadTimeoutConstant = 0,
-		uint32_t inReadTimeoutMultiplier = 0,
-		uint32_t inWriteTimeoutConstant = 0,
-		uint32_t inWriteConstantMultiplier = 0)
-		: interByteTimeout(inInterByteTimeout)
-		, readTimeoutConstant(inReadTimeoutConstant)
-		, readTimeoutMultiplier(inReadTimeoutMultiplier)
-		, writeTimeoutConstant(inWriteTimeoutConstant)
-		, writeTimeoutMultiplier(inWriteConstantMultiplier)
-	{}
-};
-
 class Serial 
 {
 public:
 
-	Serial(const std::string& port = "",
+	Serial(const char* port = "",
 		uint32_t baudRate = 9600,
-		SerialTimeout timeout = SerialTimeout(),
 		uint8_t byteSize = 8,
 		SerialParity parity = SerialParity_None,
 		SerialStopBits stopBits = SerialStopBits_1,
@@ -80,7 +45,7 @@ public:
 	void Close();
 	void Reset();
 
-	bool GetIsOpen() const;
+	bool GetIsOpen() const { return IsOpen; }
 	size_t GetAvailableBufferSize();
 
 	size_t Read(uint8_t* buffer, size_t size);
@@ -90,11 +55,21 @@ public:
 	void FlushInput();
 	void FlushOutput();
 
+	unsigned long     BaudRate;
+	uint8_t           ByteSize;
+	SerialParity      Parity;
+	SerialStopBits    StopBits;
+	SerialFlowControl FlowControl;
+
 private:
 
-	class SerialImpl;
-	SerialImpl* Impl;
+	const char* Port;
+	bool IsOpen;
 
-	class ScopedReadLock;
-	class ScopedWriteLock;
+#if _WIN32
+	HANDLE FileHandle;
+#elif __APPLE__
+	int FileHandle;
+#endif
+
 };

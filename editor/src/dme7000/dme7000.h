@@ -1170,3 +1170,8 @@ struct DME7000 : Device
 	PARAM(0x90, 0x87, Bool, PatternModify_Spiral_Enable);
 	PARAM(0xA9, 0x24, S16,  PatternModify_Spiral_Amount);
 };
+
+#undef PARAM
+#undef PARAM_FLAGS
+#undef PARAM_LIGHT
+#undef PARAM_VIDEO
