@@ -16,10 +16,10 @@ public:
 
 private:
 
-	Editor* editor;
+	Editor* EditorRef;
 
-	SDL_Window* window;
-	SDL_GLContext context;
+	SDL_Window* Window;
+	SDL_GLContext Context;
 
 	const char* glsl_version;
 

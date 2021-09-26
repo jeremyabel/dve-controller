@@ -2,14 +2,14 @@
 #include "gui.h"
 
 GUI::GUI(Editor* inEditor)
-	: editor(inEditor)
+	: EditorRef(inEditor)
 {
 
 }
 
 void GUI::Render() 
 {
-	for (Device* device : editor->devices)
+	for (Device* device : EditorRef->Devices)
 	{
 		device->DrawGUI();
 	}

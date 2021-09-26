@@ -21,6 +21,9 @@ DME7000::~DME7000()
 
 void DME7000::DrawGUI()
 {
+	ImGui::ShowDemoWindow();
+	
+	/*
 	ImGui::Begin("Hello, world!");
 
 	GraphicGui.DrawGUI();
@@ -32,6 +35,7 @@ void DME7000::DrawGUI()
 	}
 
 	ImGui::End();
+	*/
 }
 
 void DME7000::OnParameterChanged(const Parameter& changedParameter)

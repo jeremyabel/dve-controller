@@ -3,15 +3,15 @@
 #include "dme7000/dme7000.h"
 
 Editor::Editor()
-	: display(this)
-	, gui(this)
+	: EditorDisplay(this)
+	, EditorGUI(this)
 {
-	devices.emplace_back(new DME7000());
+	Devices.emplace_back(new DME7000());
 }
 
 Editor::~Editor()
 {
-	devices.clear();
+	Devices.clear();
 }
 
 void Editor::Run()
@@ -30,6 +30,6 @@ void Editor::Run()
 			}
 		}
 		
-		display.Render();
+		EditorDisplay.Render();
 	}
 }

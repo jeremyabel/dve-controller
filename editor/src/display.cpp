@@ -8,7 +8,7 @@
 #include "imgui_impl_opengl3.h"
 
 Display::Display(Editor* inEditor)
-	: editor(inEditor)
+	: EditorRef(inEditor)
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING) == -1)
 	{
@@ -37,9 +37,9 @@ Display::Display(Editor* inEditor)
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_WindowFlags WindowFlags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-	window = SDL_CreateWindow("DMEditor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1024, WindowFlags);
-	context = SDL_GL_CreateContext(window);
-	SDL_GL_MakeCurrent(window, context);
+	Window = SDL_CreateWindow("DMEditor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1024, WindowFlags);
+	Context = SDL_GL_CreateContext(Window);
+	SDL_GL_MakeCurrent(Window, Context);
 	SDL_GL_SetSwapInterval(1);
 
 	// Setup ImGui context
@@ -54,7 +54,7 @@ Display::Display(Editor* inEditor)
 	ImGui::StyleColorsDark();
 
 	// Setup ImGui Platform / Renderer bindings
-	ImGui_ImplSDL2_InitForOpenGL(window, context);
+	ImGui_ImplSDL2_InitForOpenGL(Window, Context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 }
 
@@ -64,8 +64,8 @@ Display::~Display()
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
 
-	SDL_GL_DeleteContext(context);
-	SDL_DestroyWindow(window);
+	SDL_GL_DeleteContext(Context);
+	SDL_DestroyWindow(Window);
 	SDL_Quit();
 }
 
@@ -77,7 +77,7 @@ void Display::Render()
 	ImGui::NewFrame();
 
 	// Render the user interface
-	editor->gui.Render();
+	EditorRef->EditorGUI.Render();
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -99,5 +99,5 @@ void Display::Render()
 		SDL_GL_MakeCurrent(BackupCurrentWindow, BackupCurrentContext);
 	}
 
-	SDL_GL_SwapWindow(window);
+	SDL_GL_SwapWindow(Window);
 }
