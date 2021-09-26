@@ -2,11 +2,6 @@
 
 #include <stdint.h>
 
-#if _WIN32
-#define NOMINMAX
-#include "windows.h" // @TODO: Optimize this from Aras's article
-#endif
-
 enum SerialStopBits
 {
 	SerialStopBits_1 = 1,
@@ -82,7 +77,7 @@ private:
 	bool IsOpen;
 
 #if _WIN32
-	HANDLE FileHandle;
+	void* FileHandle;
 #elif __APPLE__
 	int FileHandle;
 #endif

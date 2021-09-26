@@ -1,5 +1,14 @@
 #include <limits>
 
+#if _WIN32
+#define NOMINMAX
+#include "windows.h"
+#elif __APPLE__
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#endif
+
 #include "serial.h"
 
 Serial::Serial(const SerialConfiguration inConfig)
@@ -17,7 +26,12 @@ void Serial::Open()
 #if _WIN32
 	FileHandle = CreateFileA(Config.Port, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+	FileHandle = ::open(Port, O_RDWR | O_NOCTTY | O_NONBLOCK);
+	if (FileHandle == -1 && errno == EINTR) {
+		// Recurse, this just means the request was interrupted
+		Open();
+		return;
+	}
 #endif
 
 	Reset();
@@ -32,7 +46,8 @@ void Serial::Close()
 		CloseHandle(FileHandle);
 		FileHandle = INVALID_HANDLE_VALUE;
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+		::close(FileHandle);
+		FileHandle = -1;
 #endif
 
 		IsOpen = false;
@@ -112,7 +127,9 @@ size_t Serial::GetAvailableBufferSize()
 	ClearCommError(FileHandle, NULL, &commStats);
 	return static_cast<size_t>(commStats.cbInQue);
 #elif __APPLE__
-#error "Apple platforms not implemented yet"
+	int count = 0;
+	ioctl(FileHandle, FIONREAD, &count);
+	return static_cast<size_t>(count);
 #endif
 }
 
