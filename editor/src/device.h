@@ -5,9 +5,7 @@ struct Editor;
 struct Device
 {
 	Device() {}
-	Device(Editor* editor) 
-		: EditorRef(editor)
-	{}
+	Device(Editor* editor) : EditorRef(editor) {}
 
 	~Device() {}
 	

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
 
 class Serial 
 {
@@ -24,6 +25,8 @@ public:
 	void FlushOutput();
 
 private:
+
+	std::string GetPort();
 
 	bool IsOpen;
 

@@ -1,8 +1,16 @@
 #include <assert.h>
+#include <stdio.h>
 
 #if _WIN32
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <tchar.h>
 #include <windows.h>
+#include <setupapi.h>
+#include <initguid.h>
+#include <devguid.h>
+#include <devpkey.h>
+#include <string>
 #elif __APPLE__
 #include <fcntl.h>
 #include <ioctl.h>
@@ -24,13 +32,18 @@ Serial::~Serial()
 
 void Serial::Open()
 {
+	std::string portString = GetPort();
+	assert(!portString.empty());
+
+	const char* port = portString.c_str();
+
 #if _WIN32
-	FileHandle = CreateFileA("COM3", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	FileHandle = CreateFileA(port, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	assert(FileHandle != INVALID_HANDLE_VALUE);
 #elif __APPLE__
-	FileHandle = open("COM3", O_RDWR | O_NOCTTY | O_NONBLOCK);
+	FileHandle = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (FileHandle == -1 && errno == EINTR) {
-		// Recurse, this just means the request was interrupted
+		// Recurse; this just means the request was interrupted
 		Open();
 		return;
 	}
@@ -181,4 +194,61 @@ void Serial::FlushOutput()
 #elif __APPLE__
 	tcflush(FileHandle, TCOFLUSH);
 #endif
+}
+
+std::string Serial::GetPort()
+{
+	std::string result;
+
+#if _WIN32
+	HDEVINFO deviceInfoSet = SetupDiGetClassDevs((const GUID*)&GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
+	uint8_t deviceInfoSetIndex = 0;
+	SP_DEVINFO_DATA deviceInfoData;
+	deviceInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+
+	while (SetupDiEnumDeviceInfo(deviceInfoSet, deviceInfoSetIndex, &deviceInfoData))
+	{
+		deviceInfoSetIndex++;
+
+		// Get the hardware ID
+		TCHAR hardwareId[256];
+		DWORD hardwareIdLength;
+		if (SetupDiGetDeviceRegistryProperty(deviceInfoSet, &deviceInfoData, SPDRP_HARDWAREID, NULL, (PBYTE)hardwareId, 256, &hardwareIdLength))
+		{
+			// Check if the hardware ID matches an STM32 board 
+			bool validVID = _tcsstr(hardwareId, _T("VID_0483")) != nullptr;
+			bool validPID = _tcsstr(hardwareId, _T("PID_5740")) != nullptr;
+			if (validVID && validPID)
+			{
+				// Get the bus reported device description
+				TCHAR deviceDesc[256];
+				DWORD deviceDescLength;
+				DEVPROPTYPE propType;
+				if (SetupDiGetDeviceProperty(deviceInfoSet, &deviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc, &propType, (PBYTE)deviceDesc, 256, &deviceDescLength, 0))
+				{
+					// Check if the device description matches the DME Controller board
+					if (_tcsnccmp(deviceDesc, _T("DME Controller"), deviceDescLength) == 0)
+					{
+						HKEY h = SetupDiOpenDevRegKey(deviceInfoSet, &deviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+
+						// Get the port name
+						TCHAR portName[sizeof("COM255")]; // Largest com port value
+						DWORD portNameLength;
+						RegQueryValueEx(h, _T("PortName"), NULL, NULL, (LPBYTE)portName, &portNameLength);
+						RegCloseKey(h);
+
+						// Convert from wchar_t to std::string
+						std::wstring wStr = std::wstring(portName, (size_t)portNameLength / 2);
+						result = std::string(wStr.begin(), wStr.end());
+						break;
+					}
+				}
+			}
+		}
+	}
+#elif __APPLE__
+#error "Apple implementation is not complete."
+#endif
+
+	return result;
 }

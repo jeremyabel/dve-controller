@@ -76,8 +76,12 @@ void Display::Render()
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
 
+	int windowWidth, windowHeight, windowPosX, windowPosY;
+	SDL_GetWindowSize(Window, &windowWidth, &windowHeight);
+	SDL_GetWindowPosition(Window, &windowPosX, &windowPosY);
+
 	// Render the user interface
-	EditorRef->EditorGUI.Render();
+	EditorRef->EditorGUI.Render(windowWidth, windowHeight, windowPosX, windowPosY);
 
 	// @TODO: Store this as a member variable?
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -87,7 +91,7 @@ void Display::Render()
 	// Rendering
 	ImGui::Render();
 	glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-	glClearColor(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w, clearColor.w);
+	glClearColor(clearColor.x, clearColor.y, clearColor.z, clearColor.w);
 	glClear(GL_COLOR_BUFFER_BIT);
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

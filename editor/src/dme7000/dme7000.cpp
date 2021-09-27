@@ -52,7 +52,7 @@ void DME7000::OnParameterChanged(const Parameter& changedParameter)
 			changedParameter.GetPacket(outChannel, size);
 		}
 
-		size_t bytesWritten = EditorRef->SerialComms.Write(&packet[0], packet.size());
+		size_t bytesWritten = EditorRef->SerialComms.Write(&packet[0], size);
 
 		printf("Parameter changed: %s %d bytes, wrote %d bytes\n", changedParameter.Name, size, bytesWritten);
 	}
