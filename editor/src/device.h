@@ -11,6 +11,7 @@ struct Device
 	
 	virtual void DrawGUI() {}
 	virtual void DrawMenu() {}
+	virtual void Tick() {}
 
 	Editor* EditorRef;
 };

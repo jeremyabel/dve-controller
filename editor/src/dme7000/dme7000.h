@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_set>
+#include <queue>
+
 #include "../device.h"
 #include "types.h"
 #include "gui_graphic.h"
@@ -8,6 +11,14 @@
 #define PARAM_FLAGS(MODULE, ID, FLAGS, TYPE, NAME)  Parameter_ ## TYPE NAME = Parameter_ ## TYPE(MODULE, ID, #NAME, FLAGS);
 #define PARAM_LIGHT(MODULE, LIGHT, ID, TYPE, NAME)  Parameter_ ## TYPE ## _Light NAME = Parameter_ ## TYPE ## _Light(MODULE, LIGHT, ID, #NAME); 
 #define PARAM_VIDEO(MODULE, ID, SOURCE, TYPE, NAME) Parameter_ ## TYPE ## _Video NAME = Parameter_ ## TYPE ## _Video(MODULE, SOURCE, ID, #NAME);
+
+typedef std::queue<const Parameter*> ParameterQueue;
+
+enum PacketPriority
+{
+	PacketPriority_Low,
+	PacketPriority_High
+};
 
 struct Editor;
 
@@ -23,8 +34,15 @@ struct DME7000 : Device
 
 	GraphicGUI GraphicGui;
 
+	std::unordered_set<const Parameter*> ModifiedParameters;
+	ParameterQueue ModifiedParameters_HighPriority;
+	ParameterQueue ModifiedParameters_LowPriority;
+
+	void Tick();
 	void DrawGUI();
-	void OnParameterChanged(const Parameter& changedParameter);
+	void OnParameterChanged(const Parameter& changedParameter, const PacketPriority priority = PacketPriority_Low);
+
+	Packet GetParameterPacket(const Parameter* parameter, size_t& outSize);
 
 	void InputFreeze_Setup(const bool Enabled, const U8 Effect = 0);
 	void RecursiveTrails_Setup(const bool Enabled, const U8 Mode = 0);

@@ -232,7 +232,7 @@ std::string Serial::GetPort()
 						HKEY h = SetupDiOpenDevRegKey(deviceInfoSet, &deviceInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
 
 						// Get the port name
-						TCHAR portName[sizeof("COM255")]; // Largest com port value
+						TCHAR portName[sizeof("COM256")]; // Largest com port value
 						DWORD portNameLength;
 						RegQueryValueEx(h, _T("PortName"), NULL, NULL, (LPBYTE)portName, &portNameLength);
 						RegCloseKey(h);

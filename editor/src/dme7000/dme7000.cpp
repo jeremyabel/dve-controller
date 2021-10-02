@@ -1,20 +1,94 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../editor.h"
 #include "dme7000.h"
 #include "enums.h"
 #include "imgui.h"
 
+#define MAX_BYTES_PER_FRAME 61
+
 DME7000::DME7000(Editor* inEditor, const U8 inChannel) 
 	: EditorRef(inEditor)
 	, Channel(inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
-{}
+{
+	ModifiedParameters.reserve(2 * MAX_BYTES_PER_FRAME / 5); // 2 full frames of data / smallest packet size
+}
 
 DME7000::~DME7000()
-{
+{}
 
+void DME7000::Tick()
+{
+	// ==== THE SITUATION ====
+	// The PC and a Device are connected via a USB OTG serial port connection at 256000 baud.
+	// The Device is connected to some Video Equipment via a UART at 38400 baud.
+	// The Device's job is to relay parameter changes from the PC to the Video Equipment.
+	// The Device is strictly limited to handling 64-byte packets at 60hz (38400 baud).
+	// The PC can continually output parameter changes to the Device.
+	// The PC can easily send more data than the Device can process in one "frame" at 60hz.
+	// Should the PC throttle and buffer the data, or should the Device?
+	// What are the tradeoffs?
+
+	// ==== IMPLEMENTATION NOTES ====
+	// Continually-updating parameters = parameters automatically updated by LFOs / timelines / keyframes / etc - low priority
+	// Immediately-updating parameters = parameters changed by the user in the GUI - high priority 
+	// Key factor is that parameters animated automatically are less important than whatever parameter(s) the user is tweaking manually
+	// The PC has a pool of 61 bytes (64 - 3 for the packet header) it can transmit per frame
+	// Whenever a parameter is updated, it is added to a list
+	// On each frame, the PC iterates thru the updated parameter list and orders them based on priority, until the 61 bytes are exhausted
+	// Remaining parameters are moved to the front of the list to be transmitted on the next frame
+	// The number of remaining parameters contribute to a latency measurement, shown in the GUI
+	// Each frame is 1 field (half a frame) of NTSC video, so latency of more than 2 frames / fields is bad
+	
+	std::vector<U8> packets;
+	packets.reserve(MAX_BYTES_PER_FRAME);
+
+	// Accumulate packets until we run out of space or there are no more packets to transmit
+	while (packets.size() < MAX_BYTES_PER_FRAME)
+	{
+		ParameterQueue* targetQueue = nullptr;
+
+		// Check packet queues in order of priority
+		if (!ModifiedParameters_HighPriority.empty()) {
+			targetQueue = &ModifiedParameters_HighPriority;
+		} else if (!ModifiedParameters_LowPriority.empty()) {
+			targetQueue = &ModifiedParameters_LowPriority;
+		} else {
+			break;
+		}
+		
+		const Parameter* modifiedParameter = targetQueue->front();
+
+		size_t packetSize;
+		Packet packet = GetParameterPacket(modifiedParameter, packetSize);
+
+		// Only add the packet if the whole thing will fit
+		if (MAX_BYTES_PER_FRAME - packets.size() >= packetSize)
+		{
+			packets.insert(packets.end(), packet.data(), packet.data() + packetSize);
+			ModifiedParameters.erase(modifiedParameter);
+			targetQueue->pop();
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	// Transmit accumulated packets
+	if (packets.size() > 0)
+	{
+		// @TODO: Temporary, for debugging
+		printf("Packet: ");
+		for (size_t i = 0; i < packets.size(); i++)
+			printf("%02hhX ", packets[i]);
+		printf("\n");
+
+		//size_t bytesWritten = EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
+	}
 }
 
 void DME7000::DrawGUI()
@@ -25,37 +99,113 @@ void DME7000::DrawGUI()
 
 	GraphicGui.DrawGUI();
 
-	if (ImGui::Button("Test Input Freeze"))
+	if (ImGui::Button("Send Test Packets"))
 	{
-		Background_Color_Hue.Value = 0x7FFF;
-		OnParameterChanged(Background_Color_Hue);
+		// Test packet deduplication:
+		//Background_Color_Hue.Value = 0x7FFF;
+		//OnParameterChanged(Background_Color_Hue);
+		//OnParameterChanged(Background_Color_Hue);
+		//OnParameterChanged(Background_Color_Hue);
+
+		// Test packet throttling:
+		ColorCorrection_Primary_Curve_R_1_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_1_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_2_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_2_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_3_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_3_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_4_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_4_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_5_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_R_5_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_1_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_1_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_2_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_2_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_3_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_3_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_4_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_4_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_5_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_G_5_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_1_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_1_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_2_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_2_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_3_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_3_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_4_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_4_Y.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_5_X.Value = 0x7FFF;
+		ColorCorrection_Primary_Curve_B_5_Y.Value = 0x7FFF;
+
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_1_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_1_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_2_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_2_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_3_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_3_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_4_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_4_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_5_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_R_5_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_1_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_1_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_2_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_2_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_3_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_3_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_4_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_4_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_5_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_G_5_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_1_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_1_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_2_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_2_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_3_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_3_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_X);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_Y);
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_X, PacketPriority_High); // Param: 0xB5, 0x78
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_Y, PacketPriority_High); // Param: 0xB5, 0x79
 	}
 
 	ImGui::End();
 }
 
-void DME7000::OnParameterChanged(const Parameter& changedParameter)
+void DME7000::OnParameterChanged(const Parameter& changedParameter, const PacketPriority priority)
 {
 	if (changedParameter.IsValid())
 	{
-		U8 outChannel = Channel;
-		size_t size;
-		Packet packet;
-		
-		if (changedParameter.Flags & ParameterFlags_Global) {
-			outChannel = 0x80;
+		const Parameter* parameterPtr = &changedParameter;
+
+		const bool isUnique = ModifiedParameters.insert(parameterPtr).second;
+		if (isUnique)
+		{
+			switch (priority)
+			{
+				case PacketPriority_Low:  ModifiedParameters_LowPriority.push(parameterPtr); break;
+				case PacketPriority_High: ModifiedParameters_HighPriority.push(parameterPtr); break;
+			}
 		}
-
-		if (changedParameter.Flags & ParameterFlags_SubPicture) {
-			changedParameter.GetPacket(outChannel, SubPictureId, size);
-		} else {
-			changedParameter.GetPacket(outChannel, size);
-		}
-
-		size_t bytesWritten = EditorRef->SerialComms.Write(&packet[0], size);
-
-		printf("Parameter changed: %s %d bytes, wrote %d bytes\n", changedParameter.Name, size, bytesWritten);
 	}
+}
+
+Packet DME7000::GetParameterPacket(const Parameter* parameter, size_t& outSize)
+{
+	Packet result;
+
+	// Parameters with the Global flag use 0x80 as their channel
+	U8 outChannel = parameter->Flags & ParameterFlags_Global ? 0x80 : Channel;
+
+	if (parameter->Flags & ParameterFlags_SubPicture) {
+		result = parameter->GetPacket(outChannel, SubPictureId, outSize);
+	} else {
+		result = parameter->GetPacket(outChannel, outSize);
+	}
+	
+	return result;
 }
 
 void DME7000::InputFreeze_Setup(const bool Enabled, const U8 EffectType)

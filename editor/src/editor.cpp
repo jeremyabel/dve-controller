@@ -7,7 +7,8 @@ Editor::Editor()
 	, EditorGUI(this)
 {
 	SerialComms = Serial();
-	SerialComms.Open();
+	//SerialComms.Open();
+	//SerialComms.Flush();
 
 	Devices.emplace_back(new DME7000(this));
 }
@@ -22,6 +23,8 @@ void Editor::Run()
 	bool done = false;
 	while (!done) 
 	{	
+		int oldTime = SDL_GetTicks();
+
 		// SDL event loop
 		SDL_Event Event;
 		while (SDL_PollEvent(&Event))
@@ -32,7 +35,20 @@ void Editor::Run()
 				done = true;
 			}
 		}
-		
+
+		for (Device* device : Devices)
+		{
+			device->Tick();
+		}
+
 		EditorDisplay.Render();
+
+		// Force 60fps (16ms per frame)
+		// @QUESTION: I copied this from the internet. I don't trust it, but it works for now??? Any other suggestions?
+		uint32_t deltaTime = SDL_GetTicks() - oldTime;
+		if (deltaTime > 0 && deltaTime < 16)
+		{
+			SDL_Delay(16 - deltaTime);
+		}
 	}
 }
