@@ -1,6 +1,6 @@
 #pragma once
 
-#include <unordered_set>
+#include <map>
 #include <queue>
 
 #include "../device.h"
@@ -14,10 +14,10 @@
 
 typedef std::queue<const Parameter*> ParameterQueue;
 
-enum PacketPriority
+enum PacketPriority : uint8_t
 {
-	PacketPriority_Low,
-	PacketPriority_High
+	PacketPriority_Low  = 0,
+	PacketPriority_High = 1
 };
 
 struct Editor;
@@ -34,7 +34,7 @@ struct DME7000 : Device
 
 	GraphicGUI GraphicGui;
 
-	std::unordered_set<const Parameter*> ModifiedParameters;
+	std::map<const Parameter*, PacketPriority> ModifiedParametersByPriority;
 	ParameterQueue ModifiedParameters_HighPriority;
 	ParameterQueue ModifiedParameters_LowPriority;
 

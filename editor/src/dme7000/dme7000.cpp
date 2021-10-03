@@ -13,9 +13,7 @@ DME7000::DME7000(Editor* inEditor, const U8 inChannel)
 	, Channel(inChannel)
 	, SubPictureId(0x00)
 	, GraphicGui(this)
-{
-	ModifiedParameters.reserve(2 * MAX_BYTES_PER_FRAME / 5); // 2 full frames of data / smallest packet size
-}
+{}
 
 DME7000::~DME7000()
 {}
@@ -35,7 +33,7 @@ void DME7000::Tick()
 	// ==== IMPLEMENTATION NOTES ====
 	// Continually-updating parameters = parameters automatically updated by LFOs / timelines / keyframes / etc - low priority
 	// Immediately-updating parameters = parameters changed by the user in the GUI - high priority 
-	// Key factor is that parameters animated automatically are less important than whatever parameter(s) the user is tweaking manually
+	// The idea is that parameters animated automatically are less important than whatever parameter(s) the user is tweaking manually
 	// The PC has a pool of 61 bytes (64 - 3 for the packet header) it can transmit per frame
 	// Whenever a parameter is updated, it is added to a list
 	// On each frame, the PC iterates thru the updated parameter list and orders them based on priority, until the 61 bytes are exhausted
@@ -43,6 +41,18 @@ void DME7000::Tick()
 	// The number of remaining parameters contribute to a latency measurement, shown in the GUI
 	// Each frame is 1 field (half a frame) of NTSC video, so latency of more than 2 frames / fields is bad
 	
+	// Fill the priority queues
+	for (std::pair<const Parameter*, PacketPriority> element : ModifiedParametersByPriority)
+	{
+		switch (element.second)
+		{
+			case PacketPriority_Low: ModifiedParameters_LowPriority.push(element.first); break;
+			case PacketPriority_High: ModifiedParameters_HighPriority.push(element.first); break;
+		}
+	}
+
+	ModifiedParametersByPriority.clear();
+
 	std::vector<U8> packets;
 	packets.reserve(MAX_BYTES_PER_FRAME);
 
@@ -69,7 +79,6 @@ void DME7000::Tick()
 		if (MAX_BYTES_PER_FRAME - packets.size() >= packetSize)
 		{
 			packets.insert(packets.end(), packet.data(), packet.data() + packetSize);
-			ModifiedParameters.erase(modifiedParameter);
 			targetQueue->pop();
 		}
 		else
@@ -101,12 +110,6 @@ void DME7000::DrawGUI()
 
 	if (ImGui::Button("Send Test Packets"))
 	{
-		// Test packet deduplication:
-		//Background_Color_Hue.Value = 0x7FFF;
-		//OnParameterChanged(Background_Color_Hue);
-		//OnParameterChanged(Background_Color_Hue);
-		//OnParameterChanged(Background_Color_Hue);
-
 		// Test packet throttling:
 		ColorCorrection_Primary_Curve_R_1_X.Value = 0x7FFF;
 		ColorCorrection_Primary_Curve_R_1_Y.Value = 0x7FFF;
@@ -167,8 +170,11 @@ void DME7000::DrawGUI()
 		OnParameterChanged(ColorCorrection_Primary_Curve_B_3_Y);
 		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_X);
 		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_Y);
+
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_X); // Param: 0xB5, 0x78
 		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_X, PacketPriority_High); // Param: 0xB5, 0x78
 		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_Y, PacketPriority_High); // Param: 0xB5, 0x79
+		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_Y); // Param: 0xB5, 0x79
 	}
 
 	ImGui::End();
@@ -178,15 +184,13 @@ void DME7000::OnParameterChanged(const Parameter& changedParameter, const Packet
 {
 	if (changedParameter.IsValid())
 	{
-		const Parameter* parameterPtr = &changedParameter;
-
-		const bool isUnique = ModifiedParameters.insert(parameterPtr).second;
-		if (isUnique)
+		const bool insertResult = ModifiedParametersByPriority.insert({&changedParameter, priority}).second;
+		if (!insertResult)
 		{
-			switch (priority)
+			PacketPriority& currentPriority = ModifiedParametersByPriority[&changedParameter];
+			if (currentPriority < priority)
 			{
-				case PacketPriority_Low:  ModifiedParameters_LowPriority.push(parameterPtr); break;
-				case PacketPriority_High: ModifiedParameters_HighPriority.push(parameterPtr); break;
+				currentPriority = priority;
 			}
 		}
 	}
