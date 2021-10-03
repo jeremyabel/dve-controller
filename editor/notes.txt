@@ -1,0 +1,20 @@
+	// ==== THE SITUATION ====
+	// The PC and a Device are connected via a USB OTG serial port connection at 256000 baud.
+	// The Device is connected to some Video Equipment via a UART at 38400 baud.
+	// The Device's job is to relay parameter changes from the PC to the Video Equipment.
+	// The Device is strictly limited to handling 64-byte packets at 60hz (38400 baud).
+	// The PC can continually output parameter changes to the Device.
+	// The PC can easily send more data than the Device can process in one "frame" at 60hz.
+	// Should the PC throttle and buffer the data, or should the Device?
+	// What are the tradeoffs?
+
+	// ==== IMPLEMENTATION NOTES ====
+	// Continually-updating parameters = parameters automatically updated by LFOs / timelines / keyframes / etc - low priority
+	// Immediately-updating parameters = parameters changed by the user in the GUI - high priority 
+	// The idea is that parameters being animated automatically are less important than whatever parameter(s) the user is tweaking manually
+	// The PC has a pool of 61 bytes (64 - 3 for the packet header) it can transmit per frame
+	// Whenever a parameter is updated, it is added to a list
+	// On each frame, the PC iterates thru the updated parameter list and orders them based on priority, until the 61 bytes are exhausted
+	// Remaining parameters are moved to the front of the list to be transmitted on the next frame
+	// The number of remaining parameters contribute to a latency measurement, shown in the GUI
+	// Each frame is 1 field (half a frame) of NTSC video, so latency of more than 2 frames / fields is bad
