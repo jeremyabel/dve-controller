@@ -1,0 +1,14 @@
+Debug/
+Drivers/
+bin/
+tmp/
+*.launch
+*.tmp
+*.bak
+*.swp
+*.mxproject
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
