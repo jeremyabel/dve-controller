@@ -41,6 +41,9 @@
       <Filter>DME7000</Filter>
     </ClCompile>
     <ClCompile Include="src\serial.cpp" />
+    <ClCompile Include="src\dme7000\tests.cpp">
+      <Filter>DME7000</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\display.h" />
@@ -60,5 +63,8 @@
       <Filter>DME7000</Filter>
     </ClInclude>
     <ClInclude Include="src\serial.h" />
+    <ClInclude Include="src\dme7000\tests.h">
+      <Filter>DME7000</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

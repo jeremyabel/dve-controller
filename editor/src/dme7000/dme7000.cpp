@@ -1,12 +1,12 @@
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "../editor.h"
 #include "dme7000.h"
 #include "enums.h"
+#include "debug.h"
 #include "imgui.h"
 
-#define MAX_BYTES_PER_FRAME 61
+#define MAX_BYTES_PER_FRAME 64
 
 DME7000::DME7000(Editor* inEditor, const U8 inChannel) 
 	: EditorRef(inEditor)
@@ -20,6 +20,8 @@ DME7000::~DME7000()
 
 void DME7000::Tick()
 {	
+	//Debug::Tests::SendSingleFullPacket(this);
+
 	// Fill the priority queues
 	for (std::pair<const Parameter*, PacketPriority> element : ModifiedParametersByPriority)
 	{
@@ -32,7 +34,7 @@ void DME7000::Tick()
 
 	ModifiedParametersByPriority.clear();
 
-	std::vector<U8> packets;
+	std::vector<U8> packets = { 0x02, 0x80, 0x86 }; // Header bytes
 	packets.reserve(MAX_BYTES_PER_FRAME);
 
 	// Accumulate packets until we run out of space or there are no more packets to transmit
@@ -67,15 +69,19 @@ void DME7000::Tick()
 	}
 
 	// Transmit accumulated packets
-	if (packets.size() > 0)
+	if (packets.size() > 3) // @TODO: Replace with non-magic-number
 	{
-		// @TODO: Temporary, for debugging
-		printf("Packet: ");
-		for (size_t i = 0; i < packets.size(); i++)
-			printf("%02hhX ", packets[i]);
-		printf("\n");
+		Debug::PrintPackets("Transmit: ", packets.data(), packets.size());
+		size_t bytesWritten = EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
+	}
 
-		//size_t bytesWritten = EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
+	size_t bytesAvailable = EditorRef->SerialComms.GetAvailableBufferSize();
+	if (bytesAvailable)
+	{
+		uint8_t* buffer = (uint8_t*)malloc(bytesAvailable);
+		EditorRef->SerialComms.Read(buffer, bytesAvailable);
+		Debug::PrintPackets("Received: ", buffer, bytesAvailable);
+		free(buffer);
 	}
 }
 
@@ -90,71 +96,7 @@ void DME7000::DrawGUI()
 	if (ImGui::Button("Send Test Packets"))
 	{
 		// Test packet throttling:
-		// @TODO: Move this and the printf stuff into test.h
-		ColorCorrection_Primary_Curve_R_1_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_1_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_2_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_2_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_3_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_3_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_4_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_4_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_5_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_R_5_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_1_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_1_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_2_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_2_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_3_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_3_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_4_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_4_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_5_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_G_5_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_1_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_1_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_2_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_2_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_3_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_3_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_4_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_4_Y.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_5_X.Value = 0x7FFF;
-		ColorCorrection_Primary_Curve_B_5_Y.Value = 0x7FFF;
-
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_1_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_1_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_2_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_2_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_3_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_3_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_4_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_4_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_5_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_R_5_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_1_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_1_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_2_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_2_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_3_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_3_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_4_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_4_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_5_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_G_5_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_1_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_1_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_2_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_2_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_3_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_3_Y);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_X);
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_4_Y);
-
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_X); // Param: 0xB5, 0x78
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_X, PacketPriority_High); // Param: 0xB5, 0x78
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_Y, PacketPriority_High); // Param: 0xB5, 0x79
-		OnParameterChanged(ColorCorrection_Primary_Curve_B_5_Y); // Param: 0xB5, 0x79
+		Debug::Tests::SendTooManyFullPackets(this);
 	}
 
 	ImGui::End();

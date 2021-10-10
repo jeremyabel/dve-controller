@@ -7,8 +7,8 @@ Editor::Editor()
 	, EditorGUI(this)
 {
 	SerialComms = Serial();
-	//SerialComms.Open();
-	//SerialComms.Flush();
+	SerialComms.Open();
+	SerialComms.Flush();
 
 	Devices.emplace_back(new DME7000(this));
 }
