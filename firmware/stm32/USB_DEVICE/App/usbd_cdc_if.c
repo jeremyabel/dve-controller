@@ -25,6 +25,7 @@
 /* USER CODE BEGIN INCLUDE */
 #include <stdlib.h>
 #include <string.h>
+#include "fifo.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -99,9 +100,7 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 uint8_t lcBuffer[7];
 uint8_t rxBuffer[USB_RX_BUFFER_SIZE];
-volatile uint16_t rxBufferHeadPos = 0;
-volatile uint16_t rxBufferTailPos = 0;
-
+FIFO_Data_Typedef rxFifo;
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -162,6 +161,8 @@ static int8_t CDC_Init_FS(void)
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+
+  FIFO_Init(&rxFifo, rxBuffer, USB_RX_BUFFER_SIZE);
 
   // These are just defaults. They will be overridden by CDC_Control_FS with the CDC_SET_LINE_CODING command.
   uint32_t baudrate = 256000;
@@ -284,27 +285,10 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 
-  uint16_t len = (uint16_t)*Len;
-  uint16_t tempHeadPos = rxBufferHeadPos;
-
-  for (uint16_t i = 0; i < len; i++)
+  if (!FIFO_Write(&rxFifo, Buf, &Len))
   {
-	  rxBuffer[tempHeadPos] = Buf[i];
-
-	  // Increment position
-	  tempHeadPos++;
-	  if (tempHeadPos == USB_RX_BUFFER_SIZE)
-	  {
-		  tempHeadPos = 0;
-	  }
-
-	  if (tempHeadPos == rxBufferTailPos)
-	  {
-		  return USBD_FAIL;
-	  }
+	  return USBD_FAIL;
   }
-
-  rxBufferHeadPos = tempHeadPos;
 
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
@@ -362,24 +346,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
 uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Max)
 {
-	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
-
-	if (bytesAvailable > Max)
-	{
-		bytesAvailable = Max;
-	}
-
-	for (uint16_t i = 0; i < bytesAvailable; i++)
-	{
-		Buf[i] = rxBuffer[rxBufferTailPos];
-
-		rxBufferTailPos++;
-		if (rxBufferTailPos == USB_RX_BUFFER_SIZE)
-		{
-			rxBufferTailPos = 0;
-		}
-	}
-
+	FIFO_Read(&rxFifo, Buf, Max);
 	return USB_CDC_RX_BUFFER_OK;
 }
 
@@ -437,32 +404,18 @@ uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* 
 
 uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Max)
 {
-	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
-
-	if (bytesAvailable > Max)
-	{
-		bytesAvailable = Max;
-	}
-
-	for (uint16_t i = 0; i < bytesAvailable; i++)
-	{
-		Buf[i] = rxBuffer[rxBufferTailPos];
-	}
-
+	FIFO_Peek(&rxFifo, Buf, Max);
 	return USB_CDC_RX_BUFFER_OK;
 }
 
 uint16_t CDC_GetRxBufferBytesAvailable_FS()
 {
-	return (uint16_t)(rxBufferHeadPos - rxBufferTailPos) % USB_RX_BUFFER_SIZE;
+	return FIFO_Available(&rxFifo);
 }
 
 void CDC_FlushRxBuffer_FS()
 {
-	memset(rxBuffer, 0, USB_RX_BUFFER_SIZE);
-
-	rxBufferHeadPos = 0;
-	rxBufferTailPos = 0;
+	FIFO_Flush(&rxFifo);
 }
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
