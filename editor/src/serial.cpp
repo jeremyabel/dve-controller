@@ -120,13 +120,15 @@ void Serial::Reset()
 #endif
 }
 
-size_t Serial::GetAvailableBufferSize()
+size_t Serial::GetAvailableBufferSize() const
 {
 	assert(IsOpen);
 
 #if _WIN32
+	DWORD error;
 	COMSTAT commStats;
-	ClearCommError(FileHandle, NULL, &commStats);
+	ClearCommError(FileHandle, &error, &commStats);
+	//printf("Error: %ld\n", error);
 	return static_cast<size_t>(commStats.cbInQue);
 #elif __APPLE__
 	int count = 0;

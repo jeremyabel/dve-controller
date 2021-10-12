@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "../editor.h"
 #include "dme7000.h"
@@ -12,6 +13,7 @@ DME7000::DME7000(Editor* inEditor, const U8 inChannel)
 	: EditorRef(inEditor)
 	, Channel(inChannel)
 	, SubPictureId(0x00)
+	, TickCounter(0)
 	, GraphicGui(this)
 {}
 
@@ -20,7 +22,16 @@ DME7000::~DME7000()
 
 void DME7000::Tick()
 {	
-	//Debug::Tests::SendSingleFullPacket(this);
+	if (TickCounter == 30)
+	{
+		TickCounter = 0;
+		Debug::Tests::SendTooManyFullPackets(this);
+	}
+	else
+	{
+		TickCounter++;
+		Debug::Tests::SendSingleFullPacket(this);
+	}
 
 	// Fill the priority queues
 	for (std::pair<const Parameter*, PacketPriority> element : ModifiedParametersByPriority)
@@ -82,6 +93,8 @@ void DME7000::Tick()
 		EditorRef->SerialComms.Read(buffer, bytesAvailable);
 		Debug::PrintPackets("Received: ", buffer, bytesAvailable);
 		free(buffer);
+
+		EditorRef->SerialComms.FlushInput();
 	}
 }
 

@@ -28,7 +28,7 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\dme7000\dme7000.cpp" />
     <ClCompile Include="src\dme7000\gui_graphic.cpp" />
-    <ClCompile Include="src\dme7000\tests.cpp" />
+    <ClCompile Include="src\dme7000\debug.cpp" />
     <ClCompile Include="src\editor.cpp" />
     <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -40,7 +40,7 @@
     <ClInclude Include="src\dme7000\dme7000.h" />
     <ClInclude Include="src\dme7000\enums.h" />
     <ClInclude Include="src\dme7000\gui_graphic.h" />
-    <ClInclude Include="src\dme7000\tests.h" />
+    <ClInclude Include="src\dme7000\debug.h" />
     <ClInclude Include="src\dme7000\types.h" />
     <ClInclude Include="src\editor.h" />
     <ClInclude Include="src\gui.h" />

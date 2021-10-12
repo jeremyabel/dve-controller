@@ -15,7 +15,7 @@ public:
 	void Reset();
 
 	bool GetIsOpen() const { return IsOpen; }
-	size_t GetAvailableBufferSize();
+	size_t GetAvailableBufferSize() const;
 
 	size_t Read(uint8_t* buffer, size_t size);
 	size_t Write(const uint8_t* data, size_t size);

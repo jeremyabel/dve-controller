@@ -35,6 +35,9 @@
 /* USER CODE BEGIN PD */
 #define MAX_PACKET_SIZE 64
 #define RX_IDLE_WAIT_COUNT 2
+#define INACTIVE_BYTE 0x00
+#define ACTIVE_BYTE 0x01
+#define RECEIVE_OK_BYTE 0x02
 #define PRINT_DEBUG
 /* USER CODE END PD */
 
@@ -52,7 +55,13 @@ UART_HandleTypeDef huart2;
 volatile uint8_t currentState;
 volatile uint8_t bHasStateChanged;
 volatile uint8_t bShouldSendPacket;
+volatile uint8_t timeoutCounter;
 volatile uint32_t rxIdleCounter;
+
+//static uint8_t usbRxBuf[1024];
+//static uint8_t usbTxBuf[1024];
+//static FIFO_Data_TypeDef usbRxFifo;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,11 +71,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 static void PrepInactiveState(void);
-static void TickInactiveState(void);
 static void PrepWaitingState(void);
-static void TickWaitingState(void);
 static void PrepActiveState(void);
-static void TickActiveState(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -105,6 +111,7 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
+	timeoutCounter = 0;
 	rxIdleCounter = 0;
 	bHasStateChanged = SET;
 	currentState = ConnectionState_Inactive;
@@ -112,6 +119,7 @@ int main(void)
 	// Start the 60hz timer
 	HAL_TIM_Base_Start_IT(&htim4);
 
+	SET_STATE(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9) ? ConnectionState_Waiting : ConnectionState_Inactive);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -132,35 +140,49 @@ int main(void)
 
 	  if (currentState == ConnectionState_Active)
 	  {
-		  TickActiveState();
-		  continue;
-	  }
+		  uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+		  while (bytesAvailable > 0)
+		  {
+			  uint16_t bytesRead = 0;
+			  uint8_t dataBuffer[USB_RX_MAX_PACKET_SIZE];
+			  uint8_t headerBuffer[] = { 0x02, 0x80, 0x86 };
 
-	  if (currentState == ConnectionState_Inactive)
+			  if (CDC_ReadRxBufferUntilHeader_FS(dataBuffer, headerBuffer, &bytesRead) == USB_CDC_RX_BUFFER_OK)
+			  {
+				  // TODO: Handle incoming USB data
+			  }
+
+			  bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+		  }
+	  }
+	  else if (currentState == ConnectionState_Inactive)
 	  {
-		  TickInactiveState();
-		  continue;
+		  CDC_FlushRxBuffer_FS();
 	  }
 
-	  if (currentState == ConnectionState_Waiting)
+	  else if (currentState == ConnectionState_Waiting)
 	  {
-		  TickWaitingState();
-		  continue;
+		  CDC_FlushRxBuffer_FS();
+
+		  // Wait for a few IDLE frames, then switch to the Active state
+		  if (rxIdleCounter >= RX_IDLE_WAIT_COUNT)
+		  {
+			  SET_STATE(ConnectionState_Active);
+		  }
 	  }
 
-//	  uint16_t usbBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
-//	  if (usbBytesAvailable)
-//	  {
-//		  uint16_t bytesToRead = usbBytesAvailable >= MAX_PACKET_SIZE ? MAX_PACKET_SIZE : usbBytesAvailable;
-//		  if (CDC_ReadRxBuffer_FS(usbRxData, bytesToRead) == USB_CDC_RX_BUFFER_OK)
-//		  {
-//			  bEnablePrinting = 1;
-//			  //HAL_TIM_Base_Start_IT(&htim4);
-//			  // Transmit until USB is no longer busy
-//			  uint8_t buffer[] = "Hello, World!\n";
-//			  while (CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
-//		  }
-//	  }
+	  if (bShouldSendPacket)
+	  {
+		  bShouldSendPacket = RESET;
+		  timeoutCounter++;
+
+		  if (timeoutCounter >= 30)
+		  {
+			  timeoutCounter = 0;
+			  uint8_t buffer[1] = { currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE };
+			  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
+		  }
+	  }
 
     /* USER CODE END WHILE */
 
@@ -335,19 +357,7 @@ void PrepInactiveState(void)
 	// Switch the multiplexer over to the DME7000
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 
-	// TODO: Clear USB buffers
-}
-
-void TickInactiveState(void)
-{
-	// TODO: Transmit USB inactive packet
-	if (bShouldSendPacket)
-	{
-		uint8_t buffer[] = "Inactive\n";
-		while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
-
-		bShouldSendPacket = RESET;
-	}
+	CDC_FlushRxBuffer_FS();
 }
 
 void PrepWaitingState(void)
@@ -358,47 +368,15 @@ void PrepWaitingState(void)
 	__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 }
 
-void TickWaitingState(void)
-{
-	if (bShouldSendPacket)
-	{
-		uint8_t buffer[] = "Waiting\n";
-		while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
-
-		bShouldSendPacket = RESET;
-	}
-
-	// Wait for a few IDLE frames, then switch to the Active state
-	if (rxIdleCounter >= RX_IDLE_WAIT_COUNT)
-	{
-		SET_STATE(ConnectionState_Active);
-	}
-}
-
 void PrepActiveState(void)
 {
+	CDC_FlushRxBuffer_FS();
+
 	// Disable UART2's IDLE interrupt
 	__HAL_UART_DISABLE_IT(&huart2, UART_IT_IDLE);
 
 	// Switch the multiplexer over to the STM32
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-
-	// Start the 60hz timer
-	HAL_TIM_Base_Start_IT(&htim4);
-}
-
-void TickActiveState(void)
-{
-	// TODO: Handle incoming USB data
-	// TODO: Transmit USB active packet
-
-	if (bShouldSendPacket)
-	{
-		uint8_t buffer[] = "Active\n";
-		while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
-
-		bShouldSendPacket = RESET;
-	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)

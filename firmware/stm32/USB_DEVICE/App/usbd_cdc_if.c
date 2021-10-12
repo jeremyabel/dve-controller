@@ -23,7 +23,8 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,7 +64,7 @@
   */
 
 /* USER CODE BEGIN PRIVATE_DEFINES */
-#define HL_RX_BUFFER_SIZE 256
+
 /* USER CODE END PRIVATE_DEFINES */
 
 /**
@@ -97,9 +98,10 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 uint8_t lcBuffer[7];
-uint8_t rxBuffer[HL_RX_BUFFER_SIZE];
+uint8_t rxBuffer[USB_RX_BUFFER_SIZE];
 volatile uint16_t rxBufferHeadPos = 0;
 volatile uint16_t rxBufferTailPos = 0;
+
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -129,8 +131,8 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 static int8_t CDC_Init_FS(void);
 static int8_t CDC_DeInit_FS(void);
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
-static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
-static int8_t CDC_TransmitCplt_FS(uint8_t *pbuf, uint32_t *Len, uint8_t epnum);
+static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t* Len);
+static int8_t CDC_TransmitCplt_FS(uint8_t* pbuf, uint32_t* Len, uint8_t epnum);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -282,15 +284,19 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 
-  uint8_t len = (uint8_t) *Len;
+  uint16_t len = (uint16_t)*Len;
   uint16_t tempHeadPos = rxBufferHeadPos;
 
-  for (uint8_t i = 0; i < len; i++)
+  for (uint16_t i = 0; i < len; i++)
   {
 	  rxBuffer[tempHeadPos] = Buf[i];
 
 	  // Increment position
-	  tempHeadPos = (tempHeadPos + 1) % HL_RX_BUFFER_SIZE;
+	  tempHeadPos++;
+	  if (tempHeadPos == USB_RX_BUFFER_SIZE)
+	  {
+		  tempHeadPos = 0;
+	  }
 
 	  if (tempHeadPos == rxBufferTailPos)
 	  {
@@ -354,34 +360,91 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
-uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Len)
+uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Max)
 {
 	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
 
-	if (bytesAvailable < Len)
+	if (bytesAvailable > Max)
 	{
-		return USB_CDC_RX_BUFFER_NO_DATA;
+		bytesAvailable = Max;
 	}
 
-	for (uint8_t i = 0; i < Len; i++)
+	for (uint16_t i = 0; i < bytesAvailable; i++)
 	{
 		Buf[i] = rxBuffer[rxBufferTailPos];
-		rxBufferTailPos = (rxBufferTailPos + 1) % HL_RX_BUFFER_SIZE;
+
+		rxBufferTailPos++;
+		if (rxBufferTailPos == USB_RX_BUFFER_SIZE)
+		{
+			rxBufferTailPos = 0;
+		}
 	}
 
 	return USB_CDC_RX_BUFFER_OK;
 }
 
-uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Len)
+uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* BytesRead)
 {
 	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+	if (bytesAvailable > USB_RX_MAX_PACKET_SIZE)
+	{
+		bytesAvailable = USB_RX_MAX_PACKET_SIZE;
+	}
 
-	if (bytesAvailable < Len)
+	if (bytesAvailable == 0)
 	{
 		return USB_CDC_RX_BUFFER_NO_DATA;
 	}
 
-	for (uint8_t i = 0; i < Len; i++)
+	// Read the entire available rx buffer so we can search thru it.
+	// Return if we can't read any data from the USB buffer.
+	uint8_t packetBuf[USB_RX_MAX_PACKET_SIZE];
+	if (CDC_ReadRxBuffer_FS(packetBuf, bytesAvailable) == USB_CDC_RX_BUFFER_NO_DATA)
+	{
+		return USB_CDC_RX_BUFFER_NO_DATA;
+	}
+
+	// Search thru the rx buffer until the header is found, or the end is reached
+	uint16_t i = 0;
+	uint8_t searchBuf[USB_RX_HEADER_SIZE] = {};
+	for (i = 0; i < bytesAvailable; i++)
+	{
+		// Move the search buffer one byte to the left
+		for (uint8_t j = 0; j < USB_RX_HEADER_SIZE; j++)
+		{
+			searchBuf[j] = searchBuf[j + 1];
+		}
+
+		// Read the next byte into the end of the search buffer
+		searchBuf[USB_RX_HEADER_SIZE - 1] = packetBuf[i];
+
+		// Compare the search buffer to the header and exit if they match
+		if (memcmp(searchBuf, Header, sizeof(searchBuf)) == 0)
+		{
+			break;
+		}
+	}
+
+	if (i > 0)
+	{
+		// Copy the packet buffer from the beginning to the start of the header
+		memcpy(Buf, packetBuf, i > bytesAvailable ? bytesAvailable : i);
+		return USB_CDC_RX_BUFFER_OK;
+	}
+
+	return USB_CDC_RX_BUFFER_NO_DATA;
+}
+
+uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Max)
+{
+	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+
+	if (bytesAvailable > Max)
+	{
+		bytesAvailable = Max;
+	}
+
+	for (uint16_t i = 0; i < bytesAvailable; i++)
 	{
 		Buf[i] = rxBuffer[rxBufferTailPos];
 	}
@@ -391,12 +454,12 @@ uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Len)
 
 uint16_t CDC_GetRxBufferBytesAvailable_FS()
 {
-	return (rxBufferHeadPos - rxBufferTailPos) % HL_RX_BUFFER_SIZE;
+	return (uint16_t)(rxBufferHeadPos - rxBufferTailPos) % USB_RX_BUFFER_SIZE;
 }
 
 void CDC_FlushRxBuffer_FS()
 {
-	memset(rxBuffer, 0, HL_RX_BUFFER_SIZE);
+	memset(rxBuffer, 0, USB_RX_BUFFER_SIZE);
 
 	rxBufferHeadPos = 0;
 	rxBufferTailPos = 0;

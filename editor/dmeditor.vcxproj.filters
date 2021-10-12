@@ -41,7 +41,7 @@
       <Filter>DME7000</Filter>
     </ClCompile>
     <ClCompile Include="src\serial.cpp" />
-    <ClCompile Include="src\dme7000\tests.cpp">
+    <ClCompile Include="src\dme7000\debug.cpp">
       <Filter>DME7000</Filter>
     </ClCompile>
   </ItemGroup>
@@ -63,7 +63,7 @@
       <Filter>DME7000</Filter>
     </ClInclude>
     <ClInclude Include="src\serial.h" />
-    <ClInclude Include="src\dme7000\tests.h">
+    <ClInclude Include="src\dme7000\debug.h">
       <Filter>DME7000</Filter>
     </ClInclude>
   </ItemGroup>

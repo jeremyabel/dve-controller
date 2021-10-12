@@ -52,7 +52,9 @@
 #define APP_RX_DATA_SIZE  2048
 #define APP_TX_DATA_SIZE  2048
 /* USER CODE BEGIN EXPORTED_DEFINES */
-
+#define USB_RX_BUFFER_SIZE 2048
+#define USB_RX_MAX_PACKET_SIZE 256
+#define USB_RX_HEADER_SIZE 3
 /* USER CODE END EXPORTED_DEFINES */
 
 /**
@@ -113,8 +115,9 @@ extern USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
-uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Len);
-uint8_t CDC_PeekRxBuffer_FS(uint8_t* Buf, uint16_t Len);
+uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Max);
+uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* BytesRead);
+uint8_t CDC_PeekRxBuffer_FS(uint8_t* Buf, uint16_t Max);
 uint16_t CDC_GetRxBufferBytesAvailable_FS();
 void CDC_FlushRxBuffer_FS();
 /* USER CODE END EXPORTED_FUNCTIONS */
