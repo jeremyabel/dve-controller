@@ -25,6 +25,7 @@
 /* USER CODE BEGIN INCLUDE */
 #include <stdlib.h>
 #include <string.h>
+
 #include "fifo.h"
 /* USER CODE END INCLUDE */
 
@@ -99,6 +100,7 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 uint8_t lcBuffer[7];
+
 uint8_t rxBuffer[USB_RX_BUFFER_SIZE];
 FIFO_Data_Typedef rxFifo;
 /* USER CODE END PRIVATE_VARIABLES */
@@ -130,8 +132,8 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 static int8_t CDC_Init_FS(void);
 static int8_t CDC_DeInit_FS(void);
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
-static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t* Len);
-static int8_t CDC_TransmitCplt_FS(uint8_t* pbuf, uint32_t* Len, uint8_t epnum);
+static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
+static int8_t CDC_TransmitCplt_FS(uint8_t *pbuf, uint32_t *Len, uint8_t epnum);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -285,7 +287,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 
-  if (!FIFO_Write(&rxFifo, Buf, &Len))
+  if (!FIFO_Write(&rxFifo, Buf, *Len))
   {
 	  return USBD_FAIL;
   }
@@ -350,7 +352,7 @@ uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Max)
 	return USB_CDC_RX_BUFFER_OK;
 }
 
-uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* BytesRead)
+uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, const uint8_t* Header, uint16_t* BytesRead)
 {
 	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
 	if (bytesAvailable > USB_RX_MAX_PACKET_SIZE)
@@ -363,13 +365,10 @@ uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* 
 		return USB_CDC_RX_BUFFER_NO_DATA;
 	}
 
-	// Read the entire available rx buffer so we can search thru it.
+	// Peek the entire available rx buffer so we can search thru it without modifying the FIFO.
 	// Return if we can't read any data from the USB buffer.
 	uint8_t packetBuf[USB_RX_MAX_PACKET_SIZE];
-	if (CDC_ReadRxBuffer_FS(packetBuf, bytesAvailable) == USB_CDC_RX_BUFFER_NO_DATA)
-	{
-		return USB_CDC_RX_BUFFER_NO_DATA;
-	}
+	CDC_PeekRxBuffer_FS(packetBuf, bytesAvailable);
 
 	// Search thru the rx buffer until the header is found, or the end is reached
 	uint16_t i = 0;
@@ -388,21 +387,30 @@ uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* 
 		// Compare the search buffer to the header and exit if they match
 		if (memcmp(searchBuf, Header, sizeof(searchBuf)) == 0)
 		{
+			// The FIFO was only peeked instead of read, so read the 3 header bytes out so that the tail position is in the right place for the next read
+			uint8_t headerBuffer[USB_RX_HEADER_SIZE];
+			CDC_ReadRxBuffer_FS(headerBuffer, USB_RX_HEADER_SIZE);
+
+			// Subtract the header size from the number of bytes that have been read
+			i = i < USB_RX_HEADER_SIZE ? 0 : i - USB_RX_HEADER_SIZE;
+
 			break;
 		}
 	}
 
 	if (i > 0)
 	{
-		// Copy the packet buffer from the beginning to the start of the header
-		memcpy(Buf, packetBuf, i > bytesAvailable ? bytesAvailable : i);
+		// Read out the FIFO up to the start of the header
+		*BytesRead = i > bytesAvailable ? bytesAvailable : i;
+		CDC_ReadRxBuffer_FS(Buf, *BytesRead);
+
 		return USB_CDC_RX_BUFFER_OK;
 	}
 
 	return USB_CDC_RX_BUFFER_NO_DATA;
 }
 
-uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Max)
+uint8_t CDC_PeekRxBuffer_FS(uint8_t* Buf, uint16_t Max)
 {
 	FIFO_Peek(&rxFifo, Buf, Max);
 	return USB_CDC_RX_BUFFER_OK;
@@ -410,7 +418,7 @@ uint8_t CDC_PeekRxBuffer(uint8_t* Buf, uint16_t Max)
 
 uint16_t CDC_GetRxBufferBytesAvailable_FS()
 {
-	return FIFO_Available(&rxFifo);
+	return FIFO_ReadAvailable(&rxFifo);
 }
 
 void CDC_FlushRxBuffer_FS()

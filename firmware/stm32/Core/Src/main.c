@@ -23,7 +23,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
+#include <assert.h>
 #include "usbd_cdc_if.h"
+#include "fifo.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,41 +36,53 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MAX_PACKET_SIZE 64
+#define TX_HEADER_SIZE 3
+#define TX_PACKET_SIZE 64
+#define MIN_PACKET_SIZE 5
+#define MAX_PACKET_SIZE 9
+#define TX_BUFFER_SIZE 192
 #define RX_IDLE_WAIT_COUNT 2
+
 #define INACTIVE_BYTE 0x00
 #define ACTIVE_BYTE 0x01
 #define RECEIVE_OK_BYTE 0x02
-#define PRINT_DEBUG
+
+#define ERROR_NONE 0x00
+#define ERROR_OVERFLOW 0x03
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define SET_STATE(x) if (currentState != (x)) { currentState = (x); bHasStateChanged = SET; }
+#define SET_STATE(x) if (currentState != (x)) { currentState = (x); hasStateChanged = true; }
+#define SET_ERROR(x) if (currentError != (x)) { currentError = (x); hasErrorChanged = true; }
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t currentState;
-volatile uint8_t bHasStateChanged;
-volatile uint8_t bShouldSendPacket;
-volatile uint8_t timeoutCounter;
+volatile uint8_t currentError;
+volatile uint8_t statusUpdateCounter;
 volatile uint32_t rxIdleCounter;
+volatile bool shouldSendPacket;
+volatile bool hasStateChanged;
+volatile bool hasErrorChanged;
 
-//static uint8_t usbRxBuf[1024];
-//static uint8_t usbTxBuf[1024];
-//static FIFO_Data_TypeDef usbRxFifo;
+const uint8_t packetHeader[] = { 0x02, 0x80, 0x86 };
 
+uint8_t txBuffer[TX_BUFFER_SIZE];
+FIFO_Data_Typedef txFifo;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 static void PrepInactiveState(void);
@@ -108,13 +123,19 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   MX_USART2_UART_Init();
+  MX_DMA_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-	timeoutCounter = 0;
+	statusUpdateCounter = 0;
 	rxIdleCounter = 0;
-	bHasStateChanged = SET;
+	hasStateChanged = true;
+	hasErrorChanged = false;
+	shouldSendPacket = false;
 	currentState = ConnectionState_Inactive;
+	currentError = ERROR_NONE;
+
+	FIFO_Init(&txFifo, txBuffer, TX_BUFFER_SIZE);
 
 	// Start the 60hz timer
 	HAL_TIM_Base_Start_IT(&htim4);
@@ -126,9 +147,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if (bHasStateChanged == SET)
+	  hasErrorChanged = false;
+	  SET_ERROR(ERROR_NONE);
+
+	  if (hasStateChanged)
 	  {
-		  bHasStateChanged = RESET;
+		  hasStateChanged = false;
 
 		  switch (currentState)
 		  {
@@ -140,26 +164,48 @@ int main(void)
 
 	  if (currentState == ConnectionState_Active)
 	  {
-		  uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
-		  while (bytesAvailable > 0)
+		  bool txAvailable = true;
+		  uint16_t rxBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+		  while (rxBytesAvailable > 0 && txAvailable)
 		  {
+			  // Parse incoming USB packets
 			  uint16_t bytesRead = 0;
 			  uint8_t dataBuffer[USB_RX_MAX_PACKET_SIZE];
-			  uint8_t headerBuffer[] = { 0x02, 0x80, 0x86 };
-
-			  if (CDC_ReadRxBufferUntilHeader_FS(dataBuffer, headerBuffer, &bytesRead) == USB_CDC_RX_BUFFER_OK)
+			  if (CDC_ReadRxBufferUntilHeader_FS(dataBuffer, packetHeader, &bytesRead) == USB_CDC_RX_BUFFER_OK)
 			  {
-				  // TODO: Handle incoming USB data
+				  if (bytesRead == 0)
+				  {
+					  break;
+				  }
+
+				  // Write individual packets into the tx FIFO
+				  uint16_t ptr = 0;
+				  while (ptr < bytesRead)
+				  {
+					  // Read and verify the packet size
+					  uint8_t packetSize = dataBuffer[ptr] + 1;
+					  assert(packetSize >= MIN_PACKET_SIZE && packetSize <= MAX_PACKET_SIZE);
+
+					  if (FIFO_WriteAvailable(&txFifo) < packetSize)
+					  {
+						  SET_ERROR(ERROR_OVERFLOW);
+						  txAvailable = false;
+						  break;
+					  }
+
+					  FIFO_Write(&txFifo, &dataBuffer[ptr], packetSize);
+
+					  ptr += packetSize;
+				  }
 			  }
 
-			  bytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+			  rxBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
 		  }
 	  }
 	  else if (currentState == ConnectionState_Inactive)
 	  {
 		  CDC_FlushRxBuffer_FS();
 	  }
-
 	  else if (currentState == ConnectionState_Waiting)
 	  {
 		  CDC_FlushRxBuffer_FS();
@@ -171,17 +217,51 @@ int main(void)
 		  }
 	  }
 
-	  if (bShouldSendPacket)
+	  // Every 16ms, send tx packets from the FIFO to the USART
+	  if (shouldSendPacket)
 	  {
-		  bShouldSendPacket = RESET;
-		  timeoutCounter++;
-
-		  if (timeoutCounter >= 30)
+		  uint16_t bytesAvailable = FIFO_ReadAvailable(&txFifo);
+		  if (bytesAvailable > MIN_PACKET_SIZE)
 		  {
-			  timeoutCounter = 0;
-			  uint8_t buffer[1] = { currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE };
-			  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
+			  uint8_t txOutBuffer[TX_PACKET_SIZE] = {};
+			  memcpy(txOutBuffer, packetHeader, TX_HEADER_SIZE);
+
+			  // Fill the tx buffer with as many packets as will fit
+			  uint16_t bytesRead = TX_HEADER_SIZE;
+			  while(bytesRead < TX_PACKET_SIZE && bytesAvailable > 0)
+			  {
+				  // Peek the first byte for the packet size
+				  uint8_t packetSize = 0;
+				  FIFO_Peek(&txFifo, &packetSize, 1);
+
+				  // Check the packet size range before incrementing it to account for the size indicator byte
+				  assert(packetSize >= MIN_PACKET_SIZE - 1 && packetSize <= MAX_PACKET_SIZE - 1);
+				  packetSize += 1;
+
+				  if (packetSize > (TX_PACKET_SIZE - bytesRead))
+				  {
+					  break;
+				  }
+
+				  FIFO_Read(&txFifo, &txOutBuffer[bytesRead], packetSize);
+
+				  bytesRead += packetSize;
+				  bytesAvailable = FIFO_ReadAvailable(&txFifo);
+			  }
+
+			  HAL_UART_Transmit_DMA(&huart2, txOutBuffer, bytesRead);
 		  }
+
+		  shouldSendPacket = false;
+		  statusUpdateCounter++;
+	  }
+
+	  // Transmit a status packet to the PC every 0.5 seconds, or if the error byte changes
+	  if (statusUpdateCounter >= 30 || hasErrorChanged)
+	  {
+		  statusUpdateCounter = 0;
+		  uint8_t buffer[3] = { 0xFF, currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE, currentError };
+		  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
 	  }
 
     /* USER CODE END WHILE */
@@ -312,6 +392,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -351,13 +447,13 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void PrepInactiveState(void)
 {
+	CDC_FlushRxBuffer_FS();
+
 	// Disable UART2's IDLE interrupt
 	__HAL_UART_DISABLE_IT(&huart2, UART_IT_IDLE);
 
 	// Switch the multiplexer over to the DME7000
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-
-	CDC_FlushRxBuffer_FS();
 }
 
 void PrepWaitingState(void)
@@ -381,7 +477,7 @@ void PrepActiveState(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	bShouldSendPacket = SET;
+	shouldSendPacket = true;
 }
 
 void UART_Idle_IRQHandler(UART_HandleTypeDef* huart)

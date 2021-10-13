@@ -116,7 +116,7 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
 uint8_t CDC_ReadRxBuffer_FS(uint8_t* Buf, uint16_t Max);
-uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, uint8_t* Header, uint16_t* BytesRead);
+uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, const uint8_t* Header, uint16_t* BytesRead);
 uint8_t CDC_PeekRxBuffer_FS(uint8_t* Buf, uint16_t Max);
 uint16_t CDC_GetRxBufferBytesAvailable_FS();
 void CDC_FlushRxBuffer_FS();
