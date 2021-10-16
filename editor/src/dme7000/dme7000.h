@@ -39,6 +39,7 @@ struct DME7000 : Device
 	ParameterQueue ModifiedParameters_HighPriority;
 	ParameterQueue ModifiedParameters_LowPriority;
 
+	void Init();
 	void Tick();
 	void DrawGUI();
 	void OnParameterChanged(const Parameter& changedParameter, const PacketPriority priority = PacketPriority_Low);

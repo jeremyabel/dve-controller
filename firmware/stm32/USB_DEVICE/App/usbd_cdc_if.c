@@ -167,7 +167,7 @@ static int8_t CDC_Init_FS(void)
   FIFO_Init(&rxFifo, rxBuffer, USB_RX_BUFFER_SIZE);
 
   // These are just defaults. They will be overridden by CDC_Control_FS with the CDC_SET_LINE_CODING command.
-  uint32_t baudrate = 256000;
+  uint32_t baudrate = 115200;
   lcBuffer[0] = (uint8_t)(baudrate);
   lcBuffer[1] = (uint8_t)(baudrate >> 8);
   lcBuffer[2] = (uint8_t)(baudrate >> 16);
@@ -376,7 +376,7 @@ uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, const uint8_t* Header, uint
 	for (i = 0; i < bytesAvailable; i++)
 	{
 		// Move the search buffer one byte to the left
-		for (uint8_t j = 0; j < USB_RX_HEADER_SIZE; j++)
+		for (uint8_t j = 0; j < USB_RX_HEADER_SIZE - 1; j++)
 		{
 			searchBuf[j] = searchBuf[j + 1];
 		}

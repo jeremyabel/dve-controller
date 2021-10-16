@@ -20,18 +20,24 @@ DME7000::DME7000(Editor* inEditor, const U8 inChannel)
 DME7000::~DME7000()
 {}
 
+void DME7000::Init()
+{	
+	const uint8_t initPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF };
+	EditorRef->SerialComms.Write(initPacket, sizeof(initPacket));
+	Debug::PrintPackets("Transmit: ", initPacket, sizeof(initPacket) / sizeof(uint8_t));
+}
+
 void DME7000::Tick()
 {	
-	if (TickCounter == 30)
-	{
-		TickCounter = 0;
-		Debug::Tests::SendTooManyFullPackets(this);
-	}
-	else
-	{
-		TickCounter++;
+	//if (TickCounter <= 5)
+	//{
+	//	TickCounter++;
 		Debug::Tests::SendSingleFullPacket(this);
-	}
+		//Debug::Tests::SendTooManyFullPackets(this);
+	//}
+	//else
+	//{
+	//}
 
 	// Fill the priority queues
 	for (std::pair<const Parameter*, PacketPriority> element : ModifiedParametersByPriority)
@@ -83,19 +89,19 @@ void DME7000::Tick()
 	if (packets.size() > 3) // @TODO: Replace with non-magic-number
 	{
 		Debug::PrintPackets("Transmit: ", packets.data(), packets.size());
-		size_t bytesWritten = EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
+		EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
 	}
 
-	size_t bytesAvailable = EditorRef->SerialComms.GetAvailableBufferSize();
-	if (bytesAvailable)
-	{
-		uint8_t* buffer = (uint8_t*)malloc(bytesAvailable);
-		EditorRef->SerialComms.Read(buffer, bytesAvailable);
-		Debug::PrintPackets("Received: ", buffer, bytesAvailable);
-		free(buffer);
+	//size_t bytesAvailable = EditorRef->SerialComms.GetAvailableBufferSize();
+	//if (bytesAvailable)
+	//{
+	//	uint8_t* buffer = (uint8_t*)malloc(bytesAvailable);
+	//	EditorRef->SerialComms.Read(buffer, bytesAvailable);
+	//	Debug::PrintPackets("Received: ", buffer, bytesAvailable);
+	//	free(buffer);
 
-		EditorRef->SerialComms.FlushInput();
-	}
+	//	EditorRef->SerialComms.FlushInput();
+	//}
 }
 
 void DME7000::DrawGUI()
@@ -108,8 +114,7 @@ void DME7000::DrawGUI()
 
 	if (ImGui::Button("Send Test Packets"))
 	{
-		// Test packet throttling:
-		Debug::Tests::SendTooManyFullPackets(this);
+		Debug::Tests::SendSingleFullPacket(this);
 	}
 
 	ImGui::End();

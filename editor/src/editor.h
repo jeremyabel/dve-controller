@@ -15,6 +15,8 @@ struct Editor
 
 	std::vector<Device*> Devices;
 
+	bool isInitialized;
+
 	Editor();
 	~Editor();
 	

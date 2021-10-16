@@ -58,7 +58,7 @@ typedef enum
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void UART_Idle_IRQHandler(UART_HandleTypeDef* huart);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

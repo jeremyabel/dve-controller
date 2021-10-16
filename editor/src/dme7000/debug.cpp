@@ -20,11 +20,11 @@ void Debug::Tests::SendSingleFullPacket(DME7000* DME)
 	DME->ColorCorrection_Primary_Curve_R_3_X.Value = 0x7FFF;
 	DME->ColorCorrection_Primary_Curve_R_3_Y.Value = 0x7FFF;
 	DME->ColorCorrection_Primary_Curve_R_4_X.Value = 0x7FFF;
-	DME->ColorCorrection_Primary_Curve_R_4_Y.Value = 0x7FFF;
-	DME->ColorCorrection_Primary_Curve_R_5_X.Value = 0x7FFF;
-	DME->ColorCorrection_Primary_Curve_R_5_Y.Value = 0x7FFF;
+	//DME->ColorCorrection_Primary_Curve_R_4_Y.Value = 0x7FFF;
+	//DME->ColorCorrection_Primary_Curve_R_5_X.Value = 0x7FFF;
+	//DME->ColorCorrection_Primary_Curve_R_5_Y.Value = 0x7FFF;
 
-	// 10 * 6 bytes = 60 bytes
+	// 8 * 6 bytes = 48 bytes + 3 header bytes = 51
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_1_X);
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_1_Y);
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_2_X);
@@ -32,9 +32,9 @@ void Debug::Tests::SendSingleFullPacket(DME7000* DME)
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_3_X);
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_3_Y);
 	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_4_X);
-	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_4_Y);
-	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_5_X);
-	DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_5_Y);
+	//DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_4_Y);
+	//DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_5_X);
+	//DME->OnParameterChanged(DME->ColorCorrection_Primary_Curve_R_5_Y);
 }
 
 void Debug::Tests::SendTooManyFullPackets(DME7000* DME)

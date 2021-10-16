@@ -9,6 +9,7 @@ struct Device
 
 	~Device() {}
 	
+	virtual void Init() {}
 	virtual void DrawGUI() {}
 	virtual void DrawMenu() {}
 	virtual void Tick() {}
