@@ -44,7 +44,7 @@
 #define MIN_PACKET_SIZE 5
 #define MAX_PACKET_SIZE 9
 #define TX_BUFFER_SIZE 192
-#define PC_INIT_SIZE 4
+#define PC_STATUS_SIZE 5
 #define RX_IDLE_WAIT_COUNT 4
 
 #define INACTIVE_BYTE 0x00
@@ -57,7 +57,6 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define SET_STATE(x) if (currentState != (x)) { currentState = (x); hasStateChanged = true; }
 #define SET_ERROR(x) if (currentError != (x)) { currentError = (x); hasErrorChanged = true; }
 /* USER CODE END PM */
 
@@ -65,17 +64,17 @@
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t currentState;
 volatile uint8_t currentError;
-volatile uint8_t statusUpdateCounter;
 volatile uint32_t rxIdleCounter;
 volatile bool shouldSendPacket;
-volatile bool hasStateChanged;
 volatile bool hasErrorChanged;
 
-const uint8_t pcInitPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF };
+const uint8_t pcInitPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x01 };
+const uint8_t pcStopPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
 const uint8_t packetHeader[] = { 0x02, 0x80, 0x86 };
 
 uint8_t txInBuffer[TX_BUFFER_SIZE];
@@ -87,15 +86,38 @@ FIFO_Data_Typedef txFifo;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-static void PrepInactiveState(void);
-static void PrepWaitingState(void);
-static void PrepActiveState(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+bool ReadPCStatusPacket(const uint8_t* targetPacket)
+{
+	uint8_t dataBuffer[PC_STATUS_SIZE];
+	CDC_ReadRxBuffer_FS(dataBuffer, PC_STATUS_SIZE);
+
+	// Compare the buffer with the target packet
+	return memcmp(dataBuffer, targetPacket, sizeof(dataBuffer)) == 0;
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	shouldSendPacket = true;
+}
+
+void USART1_IRQHandler(void)
+{
+	// Count the number of idle frames
+	if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE))
+	{
+		__HAL_UART_CLEAR_IDLEFLAG(&huart1);
+		rxIdleCounter++;
+	}
+
+	HAL_UART_IRQHandler(&huart1);
+}
 /* USER CODE END 0 */
 
 /**
@@ -127,12 +149,11 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   MX_TIM4_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
 	rxIdleCounter = 0;
-	statusUpdateCounter = 0;
-	hasStateChanged = true;
 	hasErrorChanged = false;
 	shouldSendPacket = false;
 	currentState = ConnectionState_Inactive;
@@ -141,9 +162,9 @@ int main(void)
 	FIFO_Init(&txFifo, txInBuffer, TX_BUFFER_SIZE);
 
 	// Start the 60hz timer
+	// TODO: Start this when starting the active state
 	HAL_TIM_Base_Start_IT(&htim4);
 
-	SET_STATE(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9) ? ConnectionState_Waiting : ConnectionState_Inactive);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,25 +174,46 @@ int main(void)
 	  hasErrorChanged = false;
 	  SET_ERROR(ERROR_NONE);
 
-	  if (hasStateChanged)
-	  {
-		  hasStateChanged = false;
-
-		  switch (currentState)
-		  {
-		  	  case ConnectionState_Inactive: PrepInactiveState(); break;
-		  	  case ConnectionState_Waiting: PrepWaitingState(); break;
-		  	  case ConnectionState_Active: PrepActiveState(); break;
-		  }
-	  }
-
+	  // State: Active
 	  if (currentState == ConnectionState_Active)
 	  {
 		  bool txAvailable = true;
 		  uint16_t rxBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
+
+		  if (rxBytesAvailable)
+		  {
+			  DEBUGPIN_SET(1);
+		  }
+
+		  // Parse any incoming USB packets
 		  while (rxBytesAvailable > 0 && txAvailable)
 		  {
-			  // Parse incoming USB packets
+			  // Check if the PC has sent a status packet
+			  if (rxBytesAvailable == PC_STATUS_SIZE)
+			  {
+				  if (ReadPCStatusPacket(pcStopPacket))
+				  {
+					  // Reset to the inactive state if the PC quits
+					  currentState = ConnectionState_Inactive;
+
+					  // Switch UART1 back to TX-RX mode
+					  HAL_UART_DeInit(&huart1);
+					  huart1.Init.Mode = UART_MODE_TX_RX;
+					  HAL_UART_Init(&huart1);
+
+					  // Disable UART1's IDLE interrupt
+					  __HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
+
+					  // Switch the multiplexer over to the DME7000
+					  HAL_GPIO_WritePin(Multiplexer_GPIO_Port, Multiplexer_Pin, GPIO_PIN_RESET);
+
+					  // Clear any remaining bytes
+					  CDC_FlushRxBuffer_FS();
+				  }
+
+				  break;
+			  }
+
 			  uint16_t bytesRead = 0;
 			  uint8_t dataBuffer[USB_RX_MAX_PACKET_SIZE];
 			  if (CDC_ReadRxBufferUntilHeader_FS(dataBuffer, packetHeader, &bytesRead) == USB_CDC_RX_BUFFER_OK)
@@ -204,20 +246,24 @@ int main(void)
 
 			  rxBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
 		  }
+
+		  DEBUGPIN_CLR(1);
 	  }
+
+	  // State: Inactive
 	  else if (currentState == ConnectionState_Inactive)
 	  {
 		  // Try and read the initialization packet from the PC
 		  uint16_t rxBytesAvailable = CDC_GetRxBufferBytesAvailable_FS();
-		  if (rxBytesAvailable == PC_INIT_SIZE)
+		  if (rxBytesAvailable == PC_STATUS_SIZE)
 		  {
-			  uint8_t dataBuffer[PC_INIT_SIZE];
-			  CDC_ReadRxBuffer_FS(dataBuffer, PC_INIT_SIZE);
-
-			  // Transition to the waiting state if the bytes match
-			  if (memcmp(dataBuffer, pcInitPacket, sizeof(dataBuffer)) == 0)
+			  if (ReadPCStatusPacket(pcInitPacket))
 			  {
-				  SET_STATE(ConnectionState_Waiting);
+				  currentState = ConnectionState_Waiting;
+				  rxIdleCounter = 0;
+
+				  // Enable UART1's IDLE interrupt
+				  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
 			  }
 		  }
 		  else if (rxBytesAvailable > 0)
@@ -226,6 +272,8 @@ int main(void)
 		  }
 
 	  }
+
+	  // State: Waiting
 	  else if (currentState == ConnectionState_Waiting)
 	  {
 		  CDC_FlushRxBuffer_FS();
@@ -233,24 +281,38 @@ int main(void)
 		  // Wait for a few IDLE frames, then switch to the Active state
 		  if (rxIdleCounter >= RX_IDLE_WAIT_COUNT)
 		  {
-			  SET_STATE(ConnectionState_Active);
+			  currentState = ConnectionState_Active;
+			  CDC_FlushRxBuffer_FS();
+
+			  // Switch UART1 to TX-only mode
+			  HAL_UART_DeInit(&huart1);
+			  huart1.Init.Mode = UART_MODE_TX;
+			  HAL_UART_Init(&huart1);
+
+			  // Disable UART1's IDLE interrupt
+			  __HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
+
+			  // Switch the multiplexer over to the STM32
+			  HAL_GPIO_WritePin(Multiplexer_GPIO_Port, Multiplexer_Pin, GPIO_PIN_SET);
 		  }
 	  }
 
 	  // Every 16.67ms, send tx packets from the FIFO to the USART
-	  if (shouldSendPacket)
+	  if (shouldSendPacket && huart1.gState != HAL_UART_STATE_BUSY_TX)
 	  {
-		  uint8_t buffer[3] = { 0xFF, currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE, currentError };
-		  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
+		  shouldSendPacket = false;
 
+		  // Clear the tx output buffer and write the header
+		  memset(txOutBuffer, 0, TX_PACKET_SIZE);
+		  memcpy(txOutBuffer, packetHeader, TX_HEADER_SIZE);
+
+		  uint16_t bytesRead = TX_HEADER_SIZE;
 		  uint16_t bytesAvailable = FIFO_ReadAvailable(&txFifo);
 		  if (bytesAvailable > MIN_PACKET_SIZE)
 		  {
-			  memset(txOutBuffer, 0, TX_PACKET_SIZE);
-			  memcpy(txOutBuffer, packetHeader, TX_HEADER_SIZE);
+			  DEBUGPIN_SET(4);
 
 			  // Fill the tx buffer with as many packets as will fit
-			  uint16_t bytesRead = TX_HEADER_SIZE;
 			  while(bytesRead < TX_PACKET_SIZE && bytesAvailable > 0)
 			  {
 				  // Peek the first byte for the packet size
@@ -266,31 +328,27 @@ int main(void)
 					  break;
 				  }
 
-				  uint16_t bytesToRead = packetSize;
-				  while(bytesToRead > 0)
-				  {
-					  bytesToRead -= FIFO_Read(&txFifo, &txOutBuffer[bytesRead], bytesToRead);
-				  }
+				  FIFO_Read(&txFifo, &txOutBuffer[bytesRead], packetSize);
 
 				  bytesRead += packetSize;
 				  bytesAvailable = FIFO_ReadAvailable(&txFifo);
 			  }
 
-			  while(HAL_UART_Transmit(&huart1, txOutBuffer, bytesRead, 140) == HAL_BUSY);
+			  DEBUGPIN_CLR(4);
 		  }
 
-		  shouldSendPacket = false;
-		  statusUpdateCounter++;
+		  // Start the DMA transfer
+		  HAL_UART_Transmit_DMA(&huart1, txOutBuffer, bytesRead);
+
+		  DEBUGPIN_SET(3);
+
+		  // Write out the status bit. Depending on the state, this will trigger the PC to send another data packet.
+		  uint8_t buffer[3] = { 0xFF, currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE, currentError };
+		  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
+
+		  DEBUGPIN_CLR(3);
+
 	  }
-
-	  // Transmit a status packet to the PC every 0.5 seconds, or if the error or state bytes changes
-//	  if (statusUpdateCounter >= 30 || hasErrorChanged || hasStateChanged)
-//	  {
-//		  statusUpdateCounter = 0;
-//		  uint8_t buffer[3] = { 0xFF, currentState == ConnectionState_Active ? ACTIVE_BYTE : INACTIVE_BYTE, currentError };
-//		  while(CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY);
-//	  }
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -420,6 +478,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -435,7 +509,20 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4
+                          |GPIO_PIN_5, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(Multiplexer_GPIO_Port, Multiplexer_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PA1 PA2 PA3 PA4
+                           PA5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4
+                          |GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Multiplexer_Pin */
   GPIO_InitStruct.Pin = Multiplexer_Pin;
@@ -444,71 +531,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Multiplexer_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Switch_Pin */
-  GPIO_InitStruct.Pin = Switch_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(Switch_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
 }
 
-/* USER CODE BEGIN 4 */
-void PrepInactiveState(void)
-{
-	CDC_FlushRxBuffer_FS();
-
-	// Disable UART2's IDLE interrupt
-	__HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
-
-	// Switch the multiplexer over to the DME7000
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-}
-
-void PrepWaitingState(void)
-{
-	rxIdleCounter = 0;
-
-	// Enable UART2's IDLE interrupt
-	__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
-}
-
-void PrepActiveState(void)
-{
-	CDC_FlushRxBuffer_FS();
-
-	// Disable UART2's IDLE interrupt
-	__HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
-
-	// Switch the multiplexer over to the STM32
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-}
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
-{
-	shouldSendPacket = true;
-}
-
-void USART1_IRQHandler(void)
-{
-	// Update the idle counter
-	if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) == SET)
-	{
-		__HAL_UART_CLEAR_IDLEFLAG(&huart1);
-		rxIdleCounter++;
-	}
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t pin)
-{
-	if (pin == GPIO_PIN_9)
-	{
-		SET_STATE(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9) ? ConnectionState_Waiting : ConnectionState_Inactive);
-	}
-}
 /* USER CODE END 4 */
 
 /**
@@ -520,9 +544,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1)
-  {
-  }
+  assert_param(false);
   /* USER CODE END Error_Handler_Debug */
 }
 

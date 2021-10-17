@@ -51,7 +51,16 @@ typedef enum
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+#define USE_DEBUG_PINS
 
+#ifdef USE_DEBUG_PINS
+#define DEBUGPIN_SET(pin) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_ ## pin, GPIO_PIN_SET)
+#define DEBUGPIN_CLR(pin) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_ ## pin, GPIO_PIN_RESET)
+#else
+#define DEBUGPIN_TGL(pin)
+#define DEBUGPIN_SET(pin)
+#define DEBUGPIN_CLR(pin)
+#endif
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -64,9 +73,6 @@ void UART_Idle_IRQHandler(UART_HandleTypeDef* huart);
 /* Private defines -----------------------------------------------------------*/
 #define Multiplexer_Pin GPIO_PIN_8
 #define Multiplexer_GPIO_Port GPIOB
-#define Switch_Pin GPIO_PIN_9
-#define Switch_GPIO_Port GPIOB
-#define Switch_EXTI_IRQn EXTI9_5_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

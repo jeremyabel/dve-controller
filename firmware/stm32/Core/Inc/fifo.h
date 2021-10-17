@@ -23,9 +23,9 @@ typedef struct
 
 bool FIFO_Init(FIFO_Data_Typedef* inStruct, uint8_t* inBuffer, uint16_t inBufferSize);
 bool FIFO_Write(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Length);
+void FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max);
+void FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max);
 void FIFO_Flush(FIFO_Data_Typedef* inStruct);
-uint16_t FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max);
-uint16_t FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max);
 uint16_t FIFO_ReadAvailable(FIFO_Data_Typedef* inStruct);
 uint16_t FIFO_WriteAvailable(FIFO_Data_Typedef* inStruct);
 

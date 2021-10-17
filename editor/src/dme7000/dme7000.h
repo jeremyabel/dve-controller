@@ -31,7 +31,6 @@ struct DME7000 : Device
 
 	const U8 Channel;
 	U8 SubPictureId;
-	U8 TickCounter;
 
 	GraphicGUI GraphicGui;
 

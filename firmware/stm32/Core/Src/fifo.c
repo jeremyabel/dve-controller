@@ -49,16 +49,10 @@ bool FIFO_Write(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Length)
 
 	inStruct->free -= Length;
 
-//	uint16_t workFree;
-//	do {
-//		workFree = LDREXH(&inStruct->free);
-//		workFree -= Length;
-//	} while (STREXH(workFree, &inStruct->free));
-
 	return true;
 }
 
-uint16_t FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
+void FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 {
 	uint16_t bytesAvailable = FIFO_WriteAvailable(inStruct);
 
@@ -67,7 +61,6 @@ uint16_t FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 		bytesAvailable = Max;
 	}
 
-	uint16_t bytesRead = 0;
 	for (uint16_t i = 0; i < bytesAvailable; i++)
 	{
 		Buffer[i] = inStruct->buffer[inStruct->tailPos];
@@ -77,32 +70,22 @@ uint16_t FIFO_Read(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 		{
 			inStruct->tailPos = 0;
 		}
-
-		bytesRead++;
 	}
 
-	inStruct->free += bytesRead;
-
-//	uint16_t workFree;
-//	do {
-//		workFree = LDREXH(&inStruct->free);
-//		workFree += bytesAvailable;
-//	} while (STREXH(workFree, &inStruct->free));
-
-	return bytesRead;
+	inStruct->free += bytesAvailable;
 }
 
 void FIFO_Flush(FIFO_Data_Typedef* inStruct)
 {
-	//memset(inStruct->buffer, 0, inStruct->size);
+	memset(inStruct->buffer, 0, inStruct->size);
 
-	//inStruct->headPos = 0;
-	//inStruct->tailPos = 0;
-	//inStruct->overrun = 0;
-	//inStruct->free = inStruct->size;
+	inStruct->headPos = 0;
+	inStruct->tailPos = 0;
+	inStruct->overrun = 0;
+	inStruct->free = inStruct->size;
 }
 
-uint16_t FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
+void FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 {
 	uint16_t bytesAvailable = FIFO_ReadAvailable(inStruct);
 
@@ -111,7 +94,6 @@ uint16_t FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 		bytesAvailable = Max;
 	}
 
-	uint16_t bytesPeeked = 0;
 	uint16_t tempTailPos = inStruct->tailPos;
 	for (uint16_t i = 0; i < bytesAvailable; i++)
 	{
@@ -122,11 +104,7 @@ uint16_t FIFO_Peek(FIFO_Data_Typedef* inStruct, uint8_t* Buffer, uint16_t Max)
 		{
 			tempTailPos = 0;
 		}
-
-		bytesPeeked++;
 	}
-
-	return bytesPeeked;
 }
 
 uint16_t FIFO_ReadAvailable(FIFO_Data_Typedef* inStruct)

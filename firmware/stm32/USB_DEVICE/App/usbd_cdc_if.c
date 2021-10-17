@@ -366,7 +366,6 @@ uint8_t CDC_ReadRxBufferUntilHeader_FS(uint8_t* Buf, const uint8_t* Header, uint
 	}
 
 	// Peek the entire available rx buffer so we can search thru it without modifying the FIFO.
-	// Return if we can't read any data from the USB buffer.
 	uint8_t packetBuf[USB_RX_MAX_PACKET_SIZE];
 	CDC_PeekRxBuffer_FS(packetBuf, bytesAvailable);
 

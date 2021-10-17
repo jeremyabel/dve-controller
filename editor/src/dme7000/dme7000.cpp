@@ -7,13 +7,12 @@
 #include "debug.h"
 #include "imgui.h"
 
-#define MAX_BYTES_PER_FRAME 64
+#define MAX_BYTES_PER_FRAME 60
 
 DME7000::DME7000(Editor* inEditor, const U8 inChannel) 
 	: EditorRef(inEditor)
 	, Channel(inChannel)
 	, SubPictureId(0x00)
-	, TickCounter(0)
 	, GraphicGui(this)
 {}
 
@@ -22,22 +21,14 @@ DME7000::~DME7000()
 
 void DME7000::Init()
 {	
-	const uint8_t initPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF };
+	const uint8_t initPacket[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x01 };
 	EditorRef->SerialComms.Write(initPacket, sizeof(initPacket));
 	Debug::PrintPackets("Transmit: ", initPacket, sizeof(initPacket) / sizeof(uint8_t));
 }
 
 void DME7000::Tick()
 {	
-	//if (TickCounter <= 5)
-	//{
-	//	TickCounter++;
-		Debug::Tests::SendSingleFullPacket(this);
-		//Debug::Tests::SendTooManyFullPackets(this);
-	//}
-	//else
-	//{
-	//}
+	Debug::Tests::SendSingleFullPacket(this);
 
 	// Fill the priority queues
 	for (std::pair<const Parameter*, PacketPriority> element : ModifiedParametersByPriority)
@@ -91,17 +82,6 @@ void DME7000::Tick()
 		Debug::PrintPackets("Transmit: ", packets.data(), packets.size());
 		EditorRef->SerialComms.Write(&packets[0], packets.size() * sizeof(U8));
 	}
-
-	//size_t bytesAvailable = EditorRef->SerialComms.GetAvailableBufferSize();
-	//if (bytesAvailable)
-	//{
-	//	uint8_t* buffer = (uint8_t*)malloc(bytesAvailable);
-	//	EditorRef->SerialComms.Read(buffer, bytesAvailable);
-	//	Debug::PrintPackets("Received: ", buffer, bytesAvailable);
-	//	free(buffer);
-
-	//	EditorRef->SerialComms.FlushInput();
-	//}
 }
 
 void DME7000::DrawGUI()
